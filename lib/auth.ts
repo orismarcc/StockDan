@@ -3,14 +3,14 @@ import { cookies } from 'next/headers'
 
 const COOKIE = 'stockdan_session'
 
-function stripBom(s: string): string {
-  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s
+function cleanEnv(s: string): string {
+  return s.replace(/^﻿/, '').trim()
 }
 
 function secret() {
   const s = process.env.JWT_SECRET
   if (!s) throw new Error('JWT_SECRET não configurado.')
-  return new TextEncoder().encode(stripBom(s))
+  return new TextEncoder().encode(cleanEnv(s))
 }
 
 export interface SessionUser {

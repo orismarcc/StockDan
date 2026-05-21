@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Remove BOM (U+FEFF) que o Windows pode injetar no início de env vars
-function stripBom(s: string): string {
-  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s
+// Remove BOM (U+FEFF) e whitespace que o Windows pode injetar em env vars
+function cleanEnv(s: string): string {
+  return s.replace(/^﻿/, '').trim()
 }
 
 export function createServerClient() {
@@ -13,7 +13,7 @@ export function createServerClient() {
     throw new Error('Variáveis NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórias.')
   }
 
-  return createClient(stripBom(url), stripBom(key), {
+  return createClient(cleanEnv(url), cleanEnv(key), {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 }

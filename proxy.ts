@@ -33,7 +33,7 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL('/change-password', req.url))
   }
 
-  const adminOnly = ['/admin', '/farms/new', '/api/users', '/api/farms']
+  const adminOnly = ['/admin', '/farms/new', '/api/users']
   const isAdminOnly = adminOnly.some((p) => pathname.startsWith(p))
   if (isAdminOnly && user.role !== 'admin') {
     return NextResponse.redirect(new URL('/dashboard', req.url))

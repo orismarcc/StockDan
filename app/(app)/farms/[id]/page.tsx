@@ -30,7 +30,7 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
       .eq('farm_id', id)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(100),
+      .limit(500),
   ])
 
   return (

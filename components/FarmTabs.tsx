@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn, formatQuantity } from '@/lib/utils'
@@ -32,6 +32,23 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
   const [addStockFor, setAddStockFor] = useState<{ id: string; title: string; unit: 'kg' | 'bag' } | null>(null)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const router = useRouter()
+
+  // Compute per-talhão insumo usage totals from the transactions already loaded
+  const talhaoUsage = useMemo(() => {
+    const result: Record<string, { title: string; unit: 'kg' | 'bag'; total: number }[]> = {}
+    for (const tx of transactions) {
+      if (tx.type !== 'saida' || !tx.talhoes?.id || !tx.insumos) continue
+      const tid = tx.talhoes.id
+      if (!result[tid]) result[tid] = []
+      const existing = result[tid].find((s) => s.title === tx.insumos!.title)
+      if (existing) {
+        existing.total += Number(tx.quantity)
+      } else {
+        result[tid].push({ title: tx.insumos.title, unit: tx.insumos.unit, total: Number(tx.quantity) })
+      }
+    }
+    return result
+  }, [transactions])
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'insumos',   label: 'Insumos',   count: insumos.length },
@@ -184,22 +201,58 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             />
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-800">
-              <table className="w-full text-sm" style={{ minWidth: '320px' }}>
+              <table className="w-full text-sm" style={{ minWidth: '520px' }}>
                 <thead>
                   <tr className="border-b border-gray-800 bg-gray-900/60">
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nome do Talhão</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Área (ha)</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumos Utilizados</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody>
-                  {talhoes.map((t) => (
-                    <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-200">{t.name}</td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-400">
-                        {Number(t.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
-                      </td>
-                    </tr>
-                  ))}
+                  {talhoes.map((t) => {
+                    const usage = talhaoUsage[t.id] ?? []
+                    return (
+                      <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/farms/${farm.id}/talhoes/${t.id}`}
+                            className="font-medium text-gray-200 hover:text-green-400 transition-colors"
+                          >
+                            {t.name}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-gray-400 whitespace-nowrap">
+                          {Number(t.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
+                        </td>
+                        <td className="px-4 py-3">
+                          {usage.length === 0 ? (
+                            <span className="text-xs text-gray-700">Sem retiradas</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                              {usage.map((s) => (
+                                <span key={s.title} className="text-xs text-gray-400">
+                                  {s.title}:{' '}
+                                  <span className="font-medium text-gray-300">
+                                    {formatQuantity(s.total, s.unit)}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <Link
+                            href={`/farms/${farm.id}/talhoes/${t.id}`}
+                            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                          >
+                            Ver histórico
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

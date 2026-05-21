@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   description: 'Gestão de insumos agrícolas',
   manifest: '/manifest.json',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'StockDan' },
+  icons: { apple: '/icon-192.png' },
 }
 
 export const viewport: Viewport = {

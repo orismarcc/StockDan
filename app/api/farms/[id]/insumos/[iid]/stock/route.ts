@@ -20,10 +20,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const supabase = createServerClient()
 
-  // Busca insumo atual
   const { data: insumo, error: fetchErr } = await supabase
     .from('insumos')
-    .select('quantity')
+    .select('quantity, farm_id')
     .eq('id', insumo_id)
     .single()
 
@@ -31,9 +30,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insumo não encontrado.' }, { status: 404 })
   }
 
+  // Garante que o insumo pertence à fazenda do parâmetro da rota
+  if (insumo.farm_id !== farm_id) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+
   const newQty = Number(insumo.quantity) + Number(quantity)
 
-  // Atualiza estoque
   const { error: updateErr } = await supabase
     .from('insumos')
     .update({ quantity: newQty })
@@ -41,7 +44,6 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-  // Registra transação
   const { data: tx, error: txErr } = await supabase
     .from('transactions')
     .insert({
@@ -56,6 +58,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     .select()
     .single()
 
-  if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 })
+  if (txErr) {
+    // Compensação: reverte estoque se a transação falhou ao persistir
+    await supabase.from('insumos').update({ quantity: insumo.quantity }).eq('id', insumo_id)
+    return NextResponse.json({ error: txErr.message }, { status: 500 })
+  }
+
   return NextResponse.json({ ok: true, transaction: tx, newQuantity: newQty }, { status: 201 })
 }

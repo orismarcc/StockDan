@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { checkFarmAccess } from '@/lib/farmAccess'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -9,10 +10,15 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
   const { id: farm_id } = await params
+  const supabase = createServerClient()
+
+  if (!(await checkFarmAccess(supabase, session, farm_id))) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+
   const { searchParams } = new URL(req.url)
   const insumoId = searchParams.get('insumo_id')
 
-  const supabase = createServerClient()
   let query = supabase
     .from('transactions')
     .select('*, insumos(title, unit), talhoes(name), users(name)')
@@ -33,6 +39,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
   const { id: farm_id } = await params
+  const supabase = createServerClient()
+
+  if (!(await checkFarmAccess(supabase, session, farm_id))) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+
   const body = await req.json()
   const { insumo_id, talhao_id, quantity, date, notes } = body
 
@@ -43,9 +55,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Quantidade deve ser maior que zero.' }, { status: 400 })
   }
 
-  const supabase = createServerClient()
-
-  // Verifica estoque suficiente
+  // Verifica insumo e estoque
   const { data: insumo } = await supabase
     .from('insumos')
     .select('quantity, farm_id')
@@ -64,7 +74,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   const newQty = Number(insumo.quantity) - Number(quantity)
 
   // Atualiza estoque
-  await supabase.from('insumos').update({ quantity: newQty }).eq('id', insumo_id)
+  const { error: updateErr } = await supabase
+    .from('insumos')
+    .update({ quantity: newQty })
+    .eq('id', insumo_id)
+
+  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
   // Registra transação
   const { data: tx, error: txErr } = await supabase
@@ -82,6 +97,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     .select('*, insumos(title, unit), talhoes(name), users(name)')
     .single()
 
-  if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 })
+  if (txErr) {
+    // Compensação: reverte estoque se a transação falhou ao persistir
+    await supabase.from('insumos').update({ quantity: insumo.quantity }).eq('id', insumo_id)
+    return NextResponse.json({ error: txErr.message }, { status: 500 })
+  }
+
   return NextResponse.json({ ok: true, transaction: tx, newQuantity: newQty }, { status: 201 })
 }

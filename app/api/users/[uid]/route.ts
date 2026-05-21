@@ -21,7 +21,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   if (error || !data) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
 
-  // Fazendas vinculadas (para operários)
   const { data: farmLinks } = await supabase
     .from('farm_users')
     .select('farms(id, name, city, state)')
@@ -52,7 +51,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
     }
     updates.password_hash = await bcrypt.hash(password, 10)
-    updates.must_change_password = true
+    // Redefinição pelo admin NÃO força troca no próximo acesso
+    updates.must_change_password = false
   }
 
   if (Object.keys(updates).length > 0) {
@@ -60,7 +60,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Atualiza vínculos de fazenda (operários)
   if (Array.isArray(farm_ids)) {
     await supabase.from('farm_users').delete().eq('user_id', uid)
     if (farm_ids.length > 0) {

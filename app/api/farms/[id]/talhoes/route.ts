@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { checkFarmAccess } from '@/lib/farmAccess'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -10,6 +11,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const { id: farm_id } = await params
   const supabase = createServerClient()
+
+  if (!(await checkFarmAccess(supabase, session, farm_id))) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+
   const { data, error } = await supabase
     .from('talhoes')
     .select('*')

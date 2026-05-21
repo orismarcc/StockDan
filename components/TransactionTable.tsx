@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { formatDate, formatQuantity } from '@/lib/utils'
+import { formatDate, formatTime, formatQuantity } from '@/lib/utils'
 
 export interface Transaction {
   id: string
   type: 'entrada' | 'saida'
   quantity: number
   date: string
+  created_at: string
   notes: string | null
   insumos: { title: string; unit: 'kg' | 'bag' } | null
   talhoes: { id: string; name: string } | null
@@ -91,7 +92,14 @@ export function TransactionTable({
           <tbody>
             {transactions.map((tx) => (
               <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                <td className="py-3 pr-4 text-gray-400 whitespace-nowrap">{formatDate(tx.date)}</td>
+                <td className="py-3 pr-4 whitespace-nowrap">
+                <span className="text-gray-400">{formatDate(tx.date)}</span>
+                {tx.created_at && (
+                  <span className="block text-[11px] text-gray-600">
+                    reg. {formatTime(tx.created_at)}
+                  </span>
+                )}
+              </td>
                 <td className="py-3 pr-4">
                   {tx.type === 'entrada' ? (
                     <span className="inline-flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 whitespace-nowrap">

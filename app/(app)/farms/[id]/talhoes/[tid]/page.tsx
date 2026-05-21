@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
-import { formatDate, formatQuantity } from '@/lib/utils'
+import { formatDate, formatTime, formatQuantity } from '@/lib/utils'
 
 export async function generateMetadata({
   params,
@@ -34,7 +34,7 @@ export default async function TalhaoDetailPage({
     supabase.from('talhoes').select('*').eq('id', tid).eq('farm_id', farmId).single(),
     supabase
       .from('transactions')
-      .select('id, type, quantity, date, notes, insumos(title, unit), users(name)')
+      .select('id, type, quantity, date, created_at, notes, insumos(title, unit), users(name)')
       .eq('farm_id', farmId)
       .eq('talhao_id', tid)
       .eq('type', 'saida')
@@ -142,8 +142,13 @@ export default async function TalhaoDetailPage({
                 <tbody>
                   {txList.map((tx: any) => (
                     <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
-                        {formatDate(tx.date)}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="text-gray-400">{formatDate(tx.date)}</span>
+                        {tx.created_at && (
+                          <span className="block text-[11px] text-gray-600">
+                            reg. {formatTime(tx.created_at)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-200">
                         {tx.insumos?.title ?? '—'}

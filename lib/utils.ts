@@ -16,6 +16,11 @@ export function formatDate(dateStr: string): string {
   return `${d}/${m}/${y}`
 }
 
+export function formatTime(isoStr: string): string {
+  const d = new Date(isoStr)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 export function todayISO(): string {
   return new Date().toISOString().split('T')[0]
 }

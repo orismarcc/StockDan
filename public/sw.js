@@ -1,7 +1,7 @@
 const CACHE = 'stockdan-v1'
 
 // Assets garantidamente disponíveis offline após primeiro carregamento
-const PRECACHE = ['/login', '/change-password']
+const PRECACHE = ['/login', '/change-password', '/offline.html']
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -56,7 +56,7 @@ self.addEventListener('fetch', (event) => {
           return res
         })
         .catch(() =>
-          caches.match(request).then((cached) => cached ?? caches.match('/login'))
+          caches.match(request).then((cached) => cached ?? caches.match('/offline.html'))
         )
     )
     return

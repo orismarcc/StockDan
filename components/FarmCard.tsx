@@ -64,7 +64,7 @@ export function FarmCard({
           </div>
           <div className="rounded-lg border border-gray-800 bg-gray-800/40 px-3 py-2.5">
             <p className="text-lg font-bold text-gray-100">{talhaoCount}</p>
-            <p className="text-xs text-gray-500">Talhão{talhaoCount !== 1 ? 'ões' : ''}</p>
+            <p className="text-xs text-gray-500">{talhaoCount === 1 ? 'Talhão' : 'Talhões'}</p>
           </div>
         </div>
 

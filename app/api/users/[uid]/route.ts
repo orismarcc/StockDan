@@ -13,10 +13,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const { uid } = await params
   const supabase = createServerClient()
+
   const { data, error } = await supabase
     .from('users')
     .select('id, name, email, role, must_change_password, created_at')
     .eq('id', uid)
+    .eq('created_by', session.id)
     .single()
 
   if (error || !data) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
@@ -39,10 +41,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   const { uid } = await params
+  const supabase = createServerClient()
+
+  // Verifica propriedade antes de qualquer alteração
+  const { data: target } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', uid)
+    .eq('created_by', session.id)
+    .single()
+
+  if (!target) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
+
   const body = await req.json()
   const { name, role, password, farm_ids } = body
 
-  const supabase = createServerClient()
   const updates: Record<string, unknown> = {}
   if (name) updates.name = name
   if (role && ['admin', 'operario'].includes(role)) updates.role = role
@@ -51,7 +64,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
     }
     updates.password_hash = await bcrypt.hash(password, 10)
-    // Redefinição pelo admin NÃO força troca no próximo acesso
     updates.must_change_password = false
   }
 
@@ -84,8 +96,18 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   }
 
   const supabase = createServerClient()
-  const { error } = await supabase.from('users').delete().eq('id', uid)
 
+  // Verifica propriedade antes de excluir
+  const { data: target } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', uid)
+    .eq('created_by', session.id)
+    .single()
+
+  if (!target) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
+
+  const { error } = await supabase.from('users').delete().eq('id', uid)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash        TEXT NOT NULL,
   role                 TEXT NOT NULL CHECK (role IN ('admin', 'operario')),
   must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by           UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

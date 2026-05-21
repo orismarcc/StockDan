@@ -13,6 +13,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('users')
     .select('id, name, email, role, must_change_password, created_at')
+    .eq('created_by', session.id)
     .order('name')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -51,7 +52,6 @@ export async function POST(req: NextRequest) {
   }
 
   const hash = await bcrypt.hash(password, 10)
-  // Placeholder: usuário define o nome no primeiro acesso
   const placeholderName = email.toLowerCase().trim().split('@')[0]
 
   const { data, error } = await supabase
@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
       password_hash: hash,
       role,
       must_change_password: true,
+      created_by: session.id,
     })
     .select('id, name, email, role, must_change_password, created_at')
     .single()

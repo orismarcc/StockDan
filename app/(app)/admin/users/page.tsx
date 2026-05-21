@@ -15,6 +15,7 @@ export default async function UsersPage() {
   const { data: users } = await supabase
     .from('users')
     .select('id, name, email, role, must_change_password, created_at')
+    .eq('created_by', session.id)
     .order('name')
 
   return (

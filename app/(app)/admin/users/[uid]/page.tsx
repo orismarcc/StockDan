@@ -17,6 +17,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ uid
     .from('users')
     .select('id, name, email, role, must_change_password')
     .eq('id', uid)
+    .eq('created_by', session.id)
     .single()
 
   if (!user) notFound()

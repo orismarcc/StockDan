@@ -21,51 +21,61 @@ export function PWAInstallPrompt() {
   const [isOpen, setIsOpen] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isIOS, setIsIOS] = useState(false)
-  // null = ainda não verificado (evita flash no SSR)
-  const [canShow, setCanShow] = useState<boolean | null>(null)
+  // Começa false, só renderiza depois de verificar se está em standalone
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as any).standalone === true
 
-    if (standalone) {
-      setCanShow(false)
-      return
-    }
+    // Já instalado: não mostrar nada
+    if (standalone) return
 
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
     setIsIOS(ios)
 
-    // Expõe função para que o Sidebar possa abrir o sheet manualmente
+    // Sempre pronto quando não está em standalone
+    setReady(true)
+
+    // Expõe função para o Sidebar reabrir o sheet
     window.__pwaInstallOpen = () => setIsOpen(true)
 
-    // Verifica se foi dispensado recentemente
-    const dismissed = localStorage.getItem(DISMISS_KEY)
-    const recentlyDismissed = dismissed
-      ? (Date.now() - new Date(dismissed).getTime()) / 86_400_000 < DISMISS_DAYS
-      : false
-
-    const showAfterDelay = () => {
-      if (!recentlyDismissed) setTimeout(() => setIsOpen(true), 2500)
+    // Pega prompt já capturado pelo script inline no <head>
+    if (window.__deferredPrompt) {
+      setDeferredPrompt(window.__deferredPrompt)
     }
 
-    // Captura o prompt do navegador (Android/Chrome)
+    // Continua escutando caso ainda não tenha disparado
     const handlePrompt = (e: Event) => {
       e.preventDefault()
       const prompt = e as BeforeInstallPromptEvent
       window.__deferredPrompt = prompt
       setDeferredPrompt(prompt)
-      setCanShow(true)
-      showAfterDelay()
     }
-
     window.addEventListener('beforeinstallprompt', handlePrompt)
 
-    // iOS: sempre pode mostrar (instruções manuais)
-    if (ios) {
-      setCanShow(true)
-      showAfterDelay()
+    // Auto-abre após delay se não foi dispensado recentemente
+    const dismissed = localStorage.getItem(DISMISS_KEY)
+    const recentlyDismissed = dismissed
+      ? (Date.now() - new Date(dismissed).getTime()) / 86_400_000 < DISMISS_DAYS
+      : false
+
+    if (!recentlyDismissed) {
+      if (ios) {
+        // iOS: sempre auto-abre (instruções manuais)
+        setTimeout(() => setIsOpen(true), 2500)
+      } else if (window.__deferredPrompt) {
+        // Prompt já disponível: auto-abre
+        setTimeout(() => setIsOpen(true), 2500)
+      } else {
+        // Aguarda o prompt chegar e abre quando chegar
+        window.addEventListener(
+          'beforeinstallprompt',
+          () => setTimeout(() => setIsOpen(true), 2500),
+          { once: true }
+        )
+      }
     }
 
     return () => {
@@ -81,7 +91,7 @@ export function PWAInstallPrompt() {
     if (outcome === 'accepted') {
       setIsOpen(false)
       setDeferredPrompt(null)
-      setCanShow(false)
+      setReady(false)
     }
   }
 
@@ -90,16 +100,13 @@ export function PWAInstallPrompt() {
     setIsOpen(false)
   }
 
-  // Não renderiza enquanto não sabe, ou se não pode instalar
-  if (canShow !== true) return null
+  // Não renderiza no server nem se já estiver instalado
+  if (!ready) return null
 
   return (
     <>
       {isOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60"
-          onClick={handleDismiss}
-        />
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={handleDismiss} />
       )}
 
       <div
@@ -107,10 +114,8 @@ export function PWAInstallPrompt() {
           isOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
-        {/* Handle */}
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-gray-700" />
 
-        {/* Ícone + título */}
         <div className="mb-5 text-center">
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-gray-800 bg-gray-950 overflow-hidden">
             <img src="/icon192" alt="StockDan" className="h-full w-full object-cover" />
@@ -121,66 +126,48 @@ export function PWAInstallPrompt() {
           </p>
         </div>
 
-        {/* Benefícios */}
         <div className="mb-5 space-y-2.5">
-          <Benefit
-            icon="wifi"
-            label="Funciona offline"
-            sub="Registre retiradas sem internet"
-          />
-          <Benefit
-            icon="phone"
-            label="Acesso pela tela inicial"
-            sub="Como um app nativo no celular"
-          />
-          <Benefit
-            icon="zap"
-            label="Carregamento rápido"
-            sub="Abre em segundos"
-          />
+          <Benefit icon="wifi" label="Funciona offline" sub="Registre retiradas sem internet" />
+          <Benefit icon="phone" label="Acesso pela tela inicial" sub="Como um app nativo no celular" />
+          <Benefit icon="zap" label="Carregamento rápido" sub="Abre em segundos" />
         </div>
 
-        {/* Ações */}
         {isIOS ? (
           <div className="space-y-3">
             <p className="text-center text-sm text-gray-400 leading-relaxed">
               No <strong className="text-gray-200">Safari</strong>, toque em{' '}
-              <svg
-                className="inline h-4 w-4 align-middle text-gray-300"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg className="inline h-4 w-4 align-middle text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
               </svg>{' '}
-              e depois em{' '}
-              <strong className="text-gray-200">"Adicionar à Tela de Início"</strong>
+              e depois em <strong className="text-gray-200">"Adicionar à Tela de Início"</strong>
             </p>
-            <button
-              onClick={handleDismiss}
-              className="w-full rounded-xl bg-green-500 py-3.5 text-sm font-semibold text-white"
-            >
+            <button onClick={handleDismiss} className="w-full rounded-xl bg-green-500 py-3.5 text-sm font-semibold text-white">
               Entendi
             </button>
           </div>
-        ) : (
+        ) : deferredPrompt ? (
           <div className="space-y-2.5">
             <button
               onClick={handleInstall}
-              disabled={!deferredPrompt}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-sm font-semibold text-white"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
               Instalar Agora
             </button>
-            <button
-              onClick={handleDismiss}
-              className="w-full rounded-xl py-3 text-sm text-gray-500 hover:text-gray-400 transition-colors"
-            >
+            <button onClick={handleDismiss} className="w-full rounded-xl py-3 text-sm text-gray-500 hover:text-gray-400 transition-colors">
               Talvez depois
+            </button>
+          </div>
+        ) : (
+          // Navegador não suporta install prompt automático — instrução genérica
+          <div className="space-y-3">
+            <p className="text-center text-sm text-gray-400 leading-relaxed">
+              Abra este site no <strong className="text-gray-200">Chrome</strong> e use o menu do navegador para adicionar à tela inicial.
+            </p>
+            <button onClick={handleDismiss} className="w-full rounded-xl bg-green-500 py-3.5 text-sm font-semibold text-white">
+              Entendi
             </button>
           </div>
         )}

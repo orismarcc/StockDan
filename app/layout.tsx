@@ -20,6 +20,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <head>
+        {/* Captura beforeinstallprompt antes do React hidratar */}
+        <script dangerouslySetInnerHTML={{
+          __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__deferredPrompt=e;});`
+        }} />
+      </head>
       <body className="h-full bg-gray-950 text-gray-100">
         <SwRegistration />
         {children}

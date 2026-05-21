@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 interface SidebarProps {
@@ -9,14 +10,29 @@ interface SidebarProps {
   userName: string
   isOpen?: boolean
   onClose?: () => void
+  canInstall?: boolean
+  onInstall?: () => void
 }
 
-export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProps) {
+export function Sidebar({ role, userName, isOpen = false, onClose, canInstall, onInstall }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === href : pathname.startsWith(href)
+
+  useEffect(() => {
+    if (!profileOpen) return
+    function handleClick(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [profileOpen])
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -105,12 +121,57 @@ export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProp
         )}
       </nav>
 
-      {/* Usuário + Logout */}
+      {/* Perfil + Logout */}
       <div className="border-t border-gray-800 p-3">
-        <div className="rounded-lg bg-gray-800/50 px-3 py-2.5 mb-2">
-          <p className="text-sm font-medium text-gray-200 truncate">{userName}</p>
-          <p className="text-xs text-gray-500">{role === 'admin' ? 'Administrador' : 'Operador'}</p>
+        {/* Profile button com dropdown */}
+        <div ref={profileRef} className="relative mb-2">
+          {profileOpen && (
+            <div className="absolute bottom-full mb-2 left-0 right-0 rounded-xl border border-gray-700 bg-gray-900 py-1 shadow-xl z-10">
+              <Link
+                href="/change-password"
+                onClick={() => { setProfileOpen(false); onClose?.() }}
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+              >
+                <svg className="h-4 w-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+                </svg>
+                Alterar Senha
+              </Link>
+              {canInstall && onInstall && (
+                <button
+                  onClick={() => { setProfileOpen(false); onInstall() }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                >
+                  <svg className="h-4 w-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3l-3-3m0 0l-3 3m3-3V15" />
+                  </svg>
+                  Instalar App
+                </button>
+              )}
+            </div>
+          )}
+          <button
+            onClick={() => setProfileOpen((v) => !v)}
+            className="w-full rounded-lg bg-gray-800/50 px-3 py-2.5 text-left hover:bg-gray-800 transition-colors"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-200 truncate">{userName}</p>
+                <p className="text-xs text-gray-500">{role === 'admin' ? 'Administrador' : 'Operador'}</p>
+              </div>
+              <svg
+                className={cn('h-3.5 w-3.5 shrink-0 text-gray-600 transition-transform', profileOpen && 'rotate-180')}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </button>
         </div>
+
         <button
           onClick={handleLogout}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-800 hover:text-gray-300 transition-colors"

@@ -1,22 +1,15 @@
-const CACHE = 'stockdan-v1'
-
-// Assets garantidamente disponíveis offline após primeiro carregamento
-const PRECACHE = ['/login', '/change-password', '/offline.html']
+const CACHE = 'stockdan-v2'
+const PRECACHE = ['/offline.html']
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
-  event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(PRECACHE).catch(() => {}))
-  )
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE).catch(() => {})))
 })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-      )
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   )
 })
@@ -25,51 +18,58 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
 
-  // Só intercepta GET
+  // Só intercepta GET same-origin, ignora API
   if (request.method !== 'GET') return
-
-  // API: nunca intercepta (queue é feita na camada da aplicação)
+  if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith('/api/')) return
 
-  // Assets estáticos do Next.js: cache-first (são content-hashed, nunca mudam)
+  // Assets estáticos do Next.js: cache-first (content-hashed, imutáveis)
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached
-        return fetch(request).then((res) => {
-          const clone = res.clone()
-          caches.open(CACHE).then((c) => c.put(request, clone))
-          return res
-        })
-      })
+      caches.open(CACHE).then((cache) =>
+        cache.match(request).then((hit) =>
+          hit ?? fetch(request).then((res) => {
+            if (res.ok) cache.put(request, res.clone()).catch(() => {})
+            return res
+          })
+        )
+      )
     )
     return
   }
 
-  // Páginas de navegação: network-first, fallback para cache
+  // Navegação (hard nav): network-first → cache → ignoreVary → offline.html
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const clone = res.clone()
-          caches.open(CACHE).then((c) => c.put(request, clone))
-          return res
-        })
-        .catch(() =>
-          caches.match(request).then((cached) => cached ?? caches.match('/offline.html'))
-        )
+      caches.open(CACHE).then((cache) =>
+        fetch(request)
+          .then((res) => {
+            if (res.ok) cache.put(request, res.clone()).catch(() => {})
+            return res
+          })
+          .catch(async () => {
+            const hit =
+              (await cache.match(request)) ??
+              (await cache.match(request, { ignoreVary: true }))
+            return hit ?? caches.match('/offline.html')
+          })
+      )
     )
     return
   }
 
-  // Demais assets (fontes, imagens): stale-while-revalidate
+  // RSC payloads e demais assets: stale-while-revalidate com fallback offline
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request).then((res) => {
-        caches.open(CACHE).then((c) => c.put(request, res.clone()))
-        return res
+    caches.open(CACHE).then((cache) =>
+      cache.match(request).then((cached) => {
+        const networkPromise = fetch(request)
+          .then((res) => {
+            if (res.ok) cache.put(request, res.clone()).catch(() => {})
+            return res
+          })
+          .catch(() => cached ?? new Response('', { status: 503 }))
+        return cached ?? networkPromise
       })
-      return cached ?? network
-    })
+    )
   )
 })

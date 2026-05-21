@@ -10,18 +10,24 @@ interface SidebarProps {
   userName: string
   isOpen?: boolean
   onClose?: () => void
-  canInstall?: boolean
-  onInstall?: () => void
 }
 
-export function Sidebar({ role, userName, isOpen = false, onClose, canInstall, onInstall }: SidebarProps) {
+export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [profileOpen, setProfileOpen] = useState(false)
+  const [showInstallOption, setShowInstallOption] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === href : pathname.startsWith(href)
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as any).standalone === true
+    setShowInstallOption(!standalone)
+  }, [])
 
   useEffect(() => {
     if (!profileOpen) return
@@ -38,6 +44,12 @@ export function Sidebar({ role, userName, isOpen = false, onClose, canInstall, o
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
     router.refresh()
+  }
+
+  function handleInstallClick() {
+    setProfileOpen(false)
+    onClose?.()
+    window.__pwaInstallOpen?.()
   }
 
   return (
@@ -123,7 +135,6 @@ export function Sidebar({ role, userName, isOpen = false, onClose, canInstall, o
 
       {/* Perfil + Logout */}
       <div className="border-t border-gray-800 p-3">
-        {/* Profile button com dropdown */}
         <div ref={profileRef} className="relative mb-2">
           {profileOpen && (
             <div className="absolute bottom-full mb-2 left-0 right-0 rounded-xl border border-gray-700 bg-gray-900 py-1 shadow-xl z-10">
@@ -137,9 +148,9 @@ export function Sidebar({ role, userName, isOpen = false, onClose, canInstall, o
                 </svg>
                 Alterar Senha
               </Link>
-              {canInstall && onInstall && (
+              {showInstallOption && (
                 <button
-                  onClick={() => { setProfileOpen(false); onInstall() }}
+                  onClick={handleInstallClick}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                 >
                   <svg className="h-4 w-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
@@ -150,6 +161,7 @@ export function Sidebar({ role, userName, isOpen = false, onClose, canInstall, o
               )}
             </div>
           )}
+
           <button
             onClick={() => setProfileOpen((v) => !v)}
             className="w-full rounded-lg bg-gray-800/50 px-3 py-2.5 text-left hover:bg-gray-800 transition-colors"

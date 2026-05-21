@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import { formatDate, formatQuantity } from '@/lib/utils'
 
 export interface Transaction {
@@ -7,16 +10,50 @@ export interface Transaction {
   date: string
   notes: string | null
   insumos: { title: string; unit: 'kg' | 'bag' } | null
-  talhoes: { name: string } | null
+  talhoes: { id: string; name: string } | null
   users: { name: string } | null
 }
 
 interface TransactionTableProps {
   transactions: Transaction[]
   showInsumo?: boolean
+  farmId?: string
+  userRole?: 'admin' | 'operario'
+  talhoes?: { id: string; name: string; area_ha: number }[]
+  onEdit?: (tx: Transaction) => void
+  onDelete?: (txId: string) => void
 }
 
-export function TransactionTable({ transactions, showInsumo = true }: TransactionTableProps) {
+export function TransactionTable({
+  transactions,
+  showInsumo = true,
+  farmId,
+  userRole,
+  onEdit,
+  onDelete,
+}: TransactionTableProps) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+
+  const canEdit = userRole === 'admin' && farmId && (onEdit || onDelete)
+
+  async function handleDelete(txId: string) {
+    if (!farmId) return
+    setDeletingId(txId)
+    setDeleteError('')
+    const res = await fetch(`/api/farms/${farmId}/transactions/${txId}`, { method: 'DELETE' })
+    const data = await res.json()
+    setDeletingId(null)
+    if (!res.ok) {
+      setDeleteError(data.error)
+      setConfirmDeleteId(null)
+      return
+    }
+    setConfirmDeleteId(null)
+    onDelete?.(txId)
+  }
+
   if (transactions.length === 0) {
     return (
       <div className="py-12 text-center">
@@ -29,57 +66,101 @@ export function TransactionTable({ transactions, showInsumo = true }: Transactio
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-800">
-            <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Data</th>
-            <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Tipo</th>
-            {showInsumo && (
-              <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumo</th>
-            )}
-            <th className="pb-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Quantidade</th>
-            <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Talhão</th>
-            <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Usuário</th>
-            <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Observação</th>
-          </tr>
-        </thead>
-        <tbody>
-          {transactions.map((tx) => (
-            <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-              <td className="py-3 text-gray-400">{formatDate(tx.date)}</td>
-              <td className="py-3">
-                {tx.type === 'entrada' ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
-                    <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
-                      <path d="M6 2.5v7m0 0l-2.5-2.5M6 9.5l2.5-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                    </svg>
-                    Entrada
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
-                    <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
-                      <path d="M6 9.5v-7m0 0l-2.5 2.5M6 2.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                    </svg>
-                    Retirada
-                  </span>
-                )}
-              </td>
+    <div>
+      {deleteError && (
+        <p className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+          {deleteError}
+        </p>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ minWidth: '640px' }}>
+          <thead>
+            <tr className="border-b border-gray-800">
+              <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Data</th>
+              <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Tipo</th>
               {showInsumo && (
-                <td className="py-3 text-gray-300">{tx.insumos?.title ?? '—'}</td>
+                <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumo</th>
               )}
-              <td className="py-3 text-right font-mono text-gray-300">
-                {tx.insumos
-                  ? formatQuantity(tx.quantity, tx.insumos.unit)
-                  : tx.quantity}
-              </td>
-              <td className="py-3 text-gray-400">{tx.talhoes?.name ?? '—'}</td>
-              <td className="py-3 text-gray-400">{tx.users?.name ?? '—'}</td>
-              <td className="py-3 text-gray-500 max-w-xs truncate">{tx.notes ?? '—'}</td>
+              <th className="pb-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Quantidade</th>
+              <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Talhão</th>
+              <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Usuário</th>
+              <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Observação</th>
+              {canEdit && <th className="pb-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Ações</th>}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {transactions.map((tx) => (
+              <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+                <td className="py-3 pr-4 text-gray-400 whitespace-nowrap">{formatDate(tx.date)}</td>
+                <td className="py-3 pr-4">
+                  {tx.type === 'entrada' ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 whitespace-nowrap">
+                      <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
+                        <path d="M6 2.5v7m0 0l-2.5-2.5M6 9.5l2.5-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                      </svg>
+                      Entrada
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 whitespace-nowrap">
+                      <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
+                        <path d="M6 9.5v-7m0 0l-2.5 2.5M6 2.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                      </svg>
+                      Retirada
+                    </span>
+                  )}
+                </td>
+                {showInsumo && (
+                  <td className="py-3 pr-4 text-gray-300">{tx.insumos?.title ?? '—'}</td>
+                )}
+                <td className="py-3 pr-6 text-right font-mono text-gray-300 whitespace-nowrap">
+                  {tx.insumos
+                    ? formatQuantity(tx.quantity, tx.insumos.unit)
+                    : tx.quantity}
+                </td>
+                <td className="py-3 pr-4 text-gray-400 whitespace-nowrap">{tx.talhoes?.name ?? '—'}</td>
+                <td className="py-3 pr-4 text-gray-400 whitespace-nowrap">{tx.users?.name ?? '—'}</td>
+                <td className="py-3 pr-4 text-gray-500 max-w-[180px] truncate">{tx.notes ?? '—'}</td>
+                {canEdit && (
+                  <td className="py-3 text-right whitespace-nowrap">
+                    {confirmDeleteId === tx.id ? (
+                      <span className="inline-flex items-center gap-2">
+                        <button
+                          onClick={() => handleDelete(tx.id)}
+                          disabled={deletingId === tx.id}
+                          className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === tx.id ? 'Excluindo...' : 'Confirmar'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-3">
+                        <button
+                          onClick={() => onEdit?.(tx)}
+                          className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(tx.id)}
+                          className="text-xs text-red-600 hover:text-red-400 transition-colors"
+                        >
+                          Excluir
+                        </button>
+                      </span>
+                    )}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

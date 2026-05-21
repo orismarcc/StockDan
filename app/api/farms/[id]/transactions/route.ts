@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   let query = supabase
     .from('transactions')
-    .select('*, insumos(title, unit), talhoes(name), users(name)')
+    .select('*, insumos(title, unit), talhoes(id, name), users(name)')
     .eq('farm_id', farm_id)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       date,
       notes: notes || null,
     })
-    .select('*, insumos(title, unit), talhoes(name), users(name)')
+    .select('*, insumos(title, unit), talhoes(id, name), users(name)')
     .single()
 
   if (txErr) {

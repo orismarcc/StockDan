@@ -26,7 +26,7 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
     supabase.from('talhoes').select('*').eq('farm_id', id).order('name'),
     supabase
       .from('transactions')
-      .select('*, insumos(title, unit), talhoes(name), users(name)')
+      .select('*, insumos(title, unit), talhoes(id, name), users(name)')
       .eq('farm_id', id)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })

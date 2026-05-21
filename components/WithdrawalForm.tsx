@@ -40,7 +40,6 @@ export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps
   const [date,      setDate]      = useState(todayISO())
   const [notes,     setNotes]     = useState('')
   const [error,     setError]     = useState('')
-  const [success,   setSuccess]   = useState('')
   const [loading,   setLoading]   = useState(false)
   const [offlineOk, setOfflineOk] = useState(false)
 
@@ -64,7 +63,6 @@ export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    setSuccess('')
     setOfflineOk(false)
 
     if (!insumoId || !talhaoId || !quantity || !date) {
@@ -111,16 +109,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps
       return
     }
 
-    // Atualiza quantidade local com o valor retornado pelo servidor
-    if (typeof data.newQuantity === 'number') {
-      setLocalQtys((prev) => ({ ...prev, [insumoId]: data.newQuantity }))
-      insumoCache.decreaseQuantity(farmId, insumoId, qty)
-    }
-
-    setSuccess('Retirada registrada com sucesso!')
-    setQuantity('')
-    setNotes('')
-    router.refresh()
+    router.back()
   }
 
   if (insumos.length === 0 || talhoes.length === 0) {
@@ -221,11 +210,6 @@ export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps
         {error && (
           <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
             {error}
-          </p>
-        )}
-        {success && (
-          <p className="rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400">
-            {success}
           </p>
         )}
         {offlineOk && (

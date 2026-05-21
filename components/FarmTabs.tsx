@@ -7,14 +7,21 @@ import { cn, formatQuantity } from '@/lib/utils'
 import { StockBadge } from './StockBadge'
 import { TransactionTable, Transaction } from './TransactionTable'
 import { AddStockModal } from './AddStockModal'
+import { EditTransactionModal } from './EditTransactionModal'
 import { Button } from './ui/Button'
 
 type TabId = 'insumos' | 'talhoes' | 'historico'
 
+interface Talhao {
+  id: string
+  name: string
+  area_ha: number
+}
+
 interface FarmTabsProps {
   farm: { id: string; name: string }
   insumos: any[]
-  talhoes: any[]
+  talhoes: Talhao[]
   transactions: Transaction[]
   userRole: 'admin' | 'operario'
   userId: string
@@ -23,11 +30,12 @@ interface FarmTabsProps {
 export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: FarmTabsProps) {
   const [tab, setTab] = useState<TabId>('insumos')
   const [addStockFor, setAddStockFor] = useState<{ id: string; title: string; unit: 'kg' | 'bag' } | null>(null)
+  const [editTx, setEditTx] = useState<Transaction | null>(null)
   const router = useRouter()
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
-    { id: 'insumos',  label: 'Insumos',  count: insumos.length },
-    { id: 'talhoes',  label: 'Talhões',  count: talhoes.length },
+    { id: 'insumos',   label: 'Insumos',   count: insumos.length },
+    { id: 'talhoes',   label: 'Talhões',   count: talhoes.length },
     { id: 'historico', label: 'Histórico', count: transactions.length },
   ]
 
@@ -40,7 +48,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             key={t.id}
             onClick={() => setTab(t.id)}
             className={cn(
-              'flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+              'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors',
               tab === t.id
                 ? 'bg-gray-800 text-gray-100 shadow-sm'
                 : 'text-gray-500 hover:text-gray-300'
@@ -49,7 +57,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             {t.label}
             {t.count !== undefined && (
               <span className={cn(
-                'ml-2 rounded-full px-1.5 py-0.5 text-xs',
+                'ml-1.5 rounded-full px-1.5 py-0.5 text-xs',
                 tab === t.id ? 'bg-gray-700 text-gray-300' : 'bg-gray-800 text-gray-600'
               )}>
                 {t.count}
@@ -62,8 +70,10 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
       {/* Insumos */}
       {tab === 'insumos' && (
         <div>
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-gray-500">{insumos.length} insumo{insumos.length !== 1 ? 's' : ''} cadastrado{insumos.length !== 1 ? 's' : ''}</p>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-gray-500">
+              {insumos.length} insumo{insumos.length !== 1 ? 's' : ''} cadastrado{insumos.length !== 1 ? 's' : ''}
+            </p>
             <div className="flex gap-2">
               <Link href={`/farms/${farm.id}/retirada`}>
                 <Button variant="secondary" size="sm">
@@ -93,8 +103,8 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
               action={userRole === 'admin' ? { label: 'Cadastrar insumo', href: `/farms/${farm.id}/insumos/new` } : undefined}
             />
           ) : (
-            <div className="overflow-hidden rounded-xl border border-gray-800">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border border-gray-800">
+              <table className="w-full text-sm" style={{ minWidth: '540px' }}>
                 <thead>
                   <tr className="border-b border-gray-800 bg-gray-900/60">
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumo</th>
@@ -112,7 +122,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                           {ins.title}
                         </Link>
                         {ins.description && (
-                          <p className="text-xs text-gray-600 mt-0.5 truncate max-w-xs">{ins.description}</p>
+                          <p className="text-xs text-gray-600 mt-0.5 truncate max-w-[200px]">{ins.description}</p>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-400 uppercase text-xs">{ins.unit}</td>
@@ -123,11 +133,11 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                         <StockBadge quantity={ins.quantity} minQuantity={ins.min_quantity} unit={ins.unit} />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-3">
                           {userRole === 'admin' && (
                             <button
                               onClick={() => setAddStockFor({ id: ins.id, title: ins.title, unit: ins.unit })}
-                              className="text-xs text-green-500 hover:text-green-400 transition-colors"
+                              className="text-xs text-green-500 hover:text-green-400 transition-colors whitespace-nowrap"
                             >
                               + Estoque
                             </button>
@@ -173,8 +183,8 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
               action={userRole === 'admin' ? { label: 'Gerenciar talhões', href: `/farms/${farm.id}/talhoes` } : undefined}
             />
           ) : (
-            <div className="overflow-hidden rounded-xl border border-gray-800">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border border-gray-800">
+              <table className="w-full text-sm" style={{ minWidth: '320px' }}>
                 <thead>
                   <tr className="border-b border-gray-800 bg-gray-900/60">
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nome do Talhão</th>
@@ -200,11 +210,19 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
       {/* Histórico */}
       {tab === 'historico' && (
         <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-          <TransactionTable transactions={transactions} showInsumo />
+          <TransactionTable
+            transactions={transactions}
+            showInsumo
+            farmId={farm.id}
+            userRole={userRole}
+            talhoes={talhoes}
+            onEdit={(tx) => setEditTx(tx)}
+            onDelete={() => router.refresh()}
+          />
         </div>
       )}
 
-      {/* Modal de adicionar estoque */}
+      {/* Modal adicionar estoque */}
       {addStockFor && (
         <AddStockModal
           farmId={farm.id}
@@ -214,6 +232,20 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
           onClose={() => setAddStockFor(null)}
           onSuccess={() => {
             setAddStockFor(null)
+            router.refresh()
+          }}
+        />
+      )}
+
+      {/* Modal editar transação */}
+      {editTx && (
+        <EditTransactionModal
+          farmId={farm.id}
+          transaction={editTx}
+          talhoes={talhoes}
+          onClose={() => setEditTx(null)}
+          onSuccess={() => {
+            setEditTx(null)
             router.refresh()
           }}
         />

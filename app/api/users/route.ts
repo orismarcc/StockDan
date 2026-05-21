@@ -26,9 +26,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, email, password, role } = body
+  const { email, password, role } = body
 
-  if (!name || !email || !password || !role) {
+  if (!email || !password || !role) {
     return NextResponse.json({ error: 'Preencha todos os campos.' }, { status: 400 })
   }
   if (!['admin', 'operario'].includes(role)) {
@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient()
 
-  // Verifica duplicidade
   const { data: existing } = await supabase
     .from('users')
     .select('id')
@@ -52,10 +51,13 @@ export async function POST(req: NextRequest) {
   }
 
   const hash = await bcrypt.hash(password, 10)
+  // Placeholder: usuário define o nome no primeiro acesso
+  const placeholderName = email.toLowerCase().trim().split('@')[0]
+
   const { data, error } = await supabase
     .from('users')
     .insert({
-      name,
+      name: placeholderName,
       email: email.toLowerCase().trim(),
       password_hash: hash,
       role,

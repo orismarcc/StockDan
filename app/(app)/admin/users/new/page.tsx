@@ -12,7 +12,7 @@ export default function NewUserPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const [form, setForm] = useState({
-    name: '', email: '', password: '', role: 'operario',
+    email: '', password: '', role: 'operario',
   })
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
@@ -50,19 +50,12 @@ export default function NewUserPage() {
         </Link>
         <h1 className="text-2xl font-bold text-gray-100">Novo Usuário</h1>
         <p className="mt-1 text-sm text-gray-500">
-          O usuário será obrigado a trocar a senha no primeiro acesso.
+          O usuário definirá seu nome completo e senha no primeiro acesso.
         </p>
       </div>
 
       <div className="max-w-xl rounded-xl border border-gray-800 bg-gray-900 p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <Input
-            label="Nome Completo *"
-            placeholder="João da Silva"
-            value={form.name}
-            onChange={(e) => set('name', e.target.value)}
-            required
-          />
           <Input
             label="E-mail *"
             type="email"
@@ -77,7 +70,7 @@ export default function NewUserPage() {
             placeholder="Mínimo 6 caracteres"
             value={form.password}
             onChange={(e) => set('password', e.target.value)}
-            hint="O usuário deverá redefinir no primeiro acesso"
+            hint="O usuário definirá seu nome e criará uma nova senha no primeiro acesso"
             required
           />
           <Select

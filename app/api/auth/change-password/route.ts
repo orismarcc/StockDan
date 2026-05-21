@@ -9,7 +9,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
   }
 
-  const { password } = await req.json()
+  const { name, password } = await req.json()
+
+  if (!name || name.trim().length < 2) {
+    return NextResponse.json({ error: 'Informe seu nome completo.' }, { status: 400 })
+  }
   if (!password || password.length < 6) {
     return NextResponse.json({ error: 'Senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
   }
@@ -19,15 +23,18 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabase
     .from('users')
-    .update({ password_hash: hash, must_change_password: false })
+    .update({ name: name.trim(), password_hash: hash, must_change_password: false })
     .eq('id', session.id)
 
   if (error) {
-    return NextResponse.json({ error: 'Erro ao atualizar senha.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao atualizar dados.' }, { status: 500 })
   }
 
-  // Renova o token sem must_change_password
-  const token = await createToken({ ...session, mustChangePassword: false })
+  const token = await createToken({
+    ...session,
+    name: name.trim(),
+    mustChangePassword: false,
+  })
 
   const res = NextResponse.json({ ok: true })
   res.cookies.set(COOKIE, token, {

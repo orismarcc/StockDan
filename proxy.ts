@@ -24,7 +24,6 @@ export async function middleware(req: NextRequest) {
     return res
   }
 
-  // Força redefinição de senha antes de qualquer outra rota
   if (
     user.mustChangePassword &&
     !pathname.startsWith('/change-password') &&
@@ -34,7 +33,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/change-password', req.url))
   }
 
-  // Rotas exclusivas de admin
   const adminOnly = ['/admin', '/farms/new', '/api/users', '/api/farms']
   const isAdminOnly = adminOnly.some((p) => pathname.startsWith(p))
   if (isAdminOnly && user.role !== 'admin') {

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -Command \"cd 'C:\\Users\\Orismar\\Documents\\StockDan\\stockdan-app'; $changes = git status --porcelain 2>$null; if ($changes) { git add -A; $msg = 'chore: auto-deploy via Claude [' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + ']'; git commit -m $msg; git push origin master; vercel --prod --yes 2>&1 | Select-Object -Last 5 } else { Write-Output 'Sem alterações para commitar.' }\""
+          }
+        ]
+      }
+    ]
+  }
+}

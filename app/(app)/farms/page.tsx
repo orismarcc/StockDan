@@ -24,15 +24,16 @@ async function getFarmsWithStats(userId: string, role: string) {
 
   return Promise.all(
     farmsData.map(async (farm) => {
-      const { data: insumos } = await supabase
-        .from('insumos')
-        .select('quantity, min_quantity')
-        .eq('farm_id', farm.id)
+      const [{ data: insumos }, { count: talhaoCount }] = await Promise.all([
+        supabase.from('insumos').select('quantity, min_quantity').eq('farm_id', farm.id),
+        supabase.from('talhoes').select('*', { count: 'exact', head: true }).eq('farm_id', farm.id),
+      ])
 
       const list = insumos ?? []
       return {
         ...farm,
         insumoCount: list.length,
+        talhaoCount: talhaoCount ?? 0,
         emptyCount: list.filter((i: any) => Number(i.quantity) <= 0).length,
         lowCount: list.filter(
           (i: any) =>
@@ -100,6 +101,7 @@ export default async function FarmsPage() {
               city={farm.city}
               state={farm.state}
               insumoCount={farm.insumoCount}
+              talhaoCount={farm.talhaoCount}
               emptyCount={farm.emptyCount}
               lowCount={farm.lowCount}
             />

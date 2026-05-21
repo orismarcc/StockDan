@@ -78,7 +78,7 @@ export default function NewUserPage() {
             value={form.role}
             onChange={(e) => set('role', e.target.value)}
           >
-            <option value="operario">Operário</option>
+            <option value="operario">Operador</option>
             <option value="admin">Administrador</option>
           </Select>
 

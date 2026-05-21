@@ -58,7 +58,7 @@ export default async function UsersPage() {
                       ? 'border-green-500/20 bg-green-500/10 text-green-400'
                       : 'border-gray-700 bg-gray-800 text-gray-400'
                   }`}>
-                    {user.role === 'admin' ? 'Admin' : 'Operário'}
+                    {user.role === 'admin' ? 'Admin' : 'Operador'}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -77,7 +77,7 @@ export default async function UsersPage() {
                 <td className="px-4 py-3 text-right">
                   <Link
                     href={`/admin/users/${user.id}`}
-                    className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
                   >
                     Gerenciar
                   </Link>

@@ -127,28 +127,28 @@ export function TransactionTable({
                         <button
                           onClick={() => handleDelete(tx.id)}
                           disabled={deletingId === tx.id}
-                          className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-400 hover:border-red-500/50 hover:bg-red-500/20 transition-colors disabled:opacity-50"
                         >
-                          {deletingId === tx.id ? 'Excluindo...' : 'Confirmar'}
+                          {deletingId === tx.id ? 'Excluindo...' : 'Confirmar exclusão'}
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(null)}
-                          className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                          className="inline-flex items-center rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
                         >
                           Cancelar
                         </button>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-3">
+                      <span className="inline-flex items-center gap-2">
                         <button
                           onClick={() => onEdit?.(tx)}
-                          className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                          className="inline-flex items-center rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
                         >
                           Editar
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(tx.id)}
-                          className="text-xs text-red-600 hover:text-red-400 transition-colors"
+                          className="inline-flex items-center rounded-md border border-red-500/20 bg-red-500/5 px-2.5 py-1 text-xs font-medium text-red-500 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-colors"
                         >
                           Excluir
                         </button>

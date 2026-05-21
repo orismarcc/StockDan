@@ -109,7 +109,7 @@ export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProp
       <div className="border-t border-gray-800 p-3">
         <div className="rounded-lg bg-gray-800/50 px-3 py-2.5 mb-2">
           <p className="text-sm font-medium text-gray-200 truncate">{userName}</p>
-          <p className="text-xs text-gray-500 capitalize">{role}</p>
+          <p className="text-xs text-gray-500">{role === 'admin' ? 'Administrador' : 'Operador'}</p>
         </div>
         <button
           onClick={handleLogout}

@@ -150,18 +150,18 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                         <StockBadge quantity={ins.quantity} minQuantity={ins.min_quantity} unit={ins.unit} />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-3">
+                        <div className="flex items-center justify-end gap-2">
                           {userRole === 'admin' && (
                             <button
                               onClick={() => setAddStockFor({ id: ins.id, title: ins.title, unit: ins.unit })}
-                              className="text-xs text-green-500 hover:text-green-400 transition-colors whitespace-nowrap"
+                              className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 hover:border-green-500/50 hover:bg-green-500/20 transition-colors whitespace-nowrap"
                             >
                               + Estoque
                             </button>
                           )}
                           <Link
                             href={`/farms/${farm.id}/insumos/${ins.id}`}
-                            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
                           >
                             Detalhe
                           </Link>
@@ -245,7 +245,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <Link
                             href={`/farms/${farm.id}/talhoes/${t.id}`}
-                            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
                           >
                             Ver histórico
                           </Link>

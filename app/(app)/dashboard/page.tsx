@@ -23,13 +23,13 @@ async function getFarmsWithStats(userId: string, role: string) {
     farmsData = (data ?? []).map((r: any) => r.farms).filter(Boolean)
   }
 
-  // Para cada fazenda, busca contagem de insumos e status
+  // Para cada fazenda, busca contagem de insumos, talhões e status
   const farmsWithStats = await Promise.all(
     farmsData.map(async (farm) => {
-      const { data: insumos } = await supabase
-        .from('insumos')
-        .select('quantity, min_quantity')
-        .eq('farm_id', farm.id)
+      const [{ data: insumos }, { count: talhaoCount }] = await Promise.all([
+        supabase.from('insumos').select('quantity, min_quantity').eq('farm_id', farm.id),
+        supabase.from('talhoes').select('*', { count: 'exact', head: true }).eq('farm_id', farm.id),
+      ])
 
       const list = insumos ?? []
       const emptyCount = list.filter((i: any) => Number(i.quantity) <= 0).length
@@ -42,6 +42,7 @@ async function getFarmsWithStats(userId: string, role: string) {
       return {
         ...farm,
         insumoCount: list.length,
+        talhaoCount: talhaoCount ?? 0,
         emptyCount,
         lowCount,
       }
@@ -105,6 +106,7 @@ export default async function DashboardPage() {
               city={farm.city}
               state={farm.state}
               insumoCount={farm.insumoCount}
+              talhaoCount={farm.talhaoCount}
               emptyCount={farm.emptyCount}
               lowCount={farm.lowCount}
             />

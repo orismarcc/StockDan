@@ -80,7 +80,7 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
             onChange={(e) => setRole(e.target.value)}
             disabled={user.id === currentUserId}
           >
-            <option value="operario">Operário</option>
+            <option value="operario">Operador</option>
             <option value="admin">Administrador</option>
           </Select>
           <Input
@@ -104,7 +104,7 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
         <div className="rounded-xl border border-gray-800 bg-gray-900 p-6">
           <h2 className="mb-1 text-sm font-semibold text-gray-400 uppercase tracking-wider">Fazendas Vinculadas</h2>
           <p className="mb-4 text-xs text-gray-600">
-            Selecione as fazendas que este operário pode acessar.
+            Selecione as fazendas que este operador pode acessar.
           </p>
           <div className="space-y-2">
             {allFarms.map((farm) => {

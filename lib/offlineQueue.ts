@@ -8,6 +8,7 @@ export interface QueueItem {
   quantity: number
   date: string
   notes: string | null
+  area_ha: number | null
   created_at: string
   retries: number
 }

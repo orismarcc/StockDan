@@ -13,13 +13,40 @@ export default async function RetiradaPage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const supabase = createServerClient()
 
-  const [{ data: farm }, { data: insumos }, { data: talhoes }] = await Promise.all([
+  const [{ data: farm }, { data: insumos }, { data: talhoes }, { data: txArea }] = await Promise.all([
     supabase.from('farms').select('id, name').eq('id', id).single(),
     supabase.from('insumos').select('id, title, unit, quantity').eq('farm_id', id).order('title'),
     supabase.from('talhoes').select('id, name, area_ha').eq('farm_id', id).order('name'),
+    // Busca transações com area_ha para computar preview por talhão
+    supabase
+      .from('transactions')
+      .select('talhao_id, quantity, area_ha, date')
+      .eq('farm_id', id)
+      .eq('type', 'saida')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false }),
   ])
 
   if (!farm) notFound()
+
+  // Computa stats por talhão: área acumulada e último kg/ha registrado
+  const talhaoStats: Record<string, { accumArea: number; lastKgHa: number | null; lastDate: string | null }> = {}
+
+  for (const tx of txArea ?? []) {
+    if (!tx.talhao_id) continue
+    if (!talhaoStats[tx.talhao_id]) {
+      talhaoStats[tx.talhao_id] = { accumArea: 0, lastKgHa: null, lastDate: null }
+    }
+    const stat = talhaoStats[tx.talhao_id]
+    if (tx.area_ha != null && Number(tx.area_ha) > 0) {
+      stat.accumArea += Number(tx.area_ha)
+      // Primeiro registro (mais recente, pois veio ordenado desc) com area_ha = último kg/ha
+      if (stat.lastKgHa === null) {
+        stat.lastKgHa = Number(tx.quantity) / Number(tx.area_ha)
+        stat.lastDate = tx.date
+      }
+    }
+  }
 
   return (
     <div>
@@ -44,6 +71,7 @@ export default async function RetiradaPage({ params }: { params: Promise<{ id: s
           farmId={id}
           insumos={insumos ?? []}
           talhoes={talhoes ?? []}
+          talhaoStats={talhaoStats}
         />
       </div>
     </div>

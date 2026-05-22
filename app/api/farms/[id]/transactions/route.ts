@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const body = await req.json()
-  const { insumo_id, talhao_id, quantity, date, notes } = body
+  const { insumo_id, talhao_id, quantity, date, notes, area_ha } = body
 
   if (!insumo_id || !talhao_id || !quantity || !date) {
     return NextResponse.json({ error: 'Insumo, talhão, quantidade e data são obrigatórios.' }, { status: 400 })
@@ -93,6 +93,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       quantity: Number(quantity),
       date,
       notes: notes || null,
+      area_ha: area_ha != null && Number(area_ha) > 0 ? Number(area_ha) : null,
     })
     .select('*, insumos(title, unit), talhoes(id, name), users(name)')
     .single()

@@ -50,6 +50,21 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
     return result
   }, [transactions])
 
+  // Área acumulada e média kg/ha por talhão
+  const talhaoAreaStats = useMemo(() => {
+    const result: Record<string, { accumArea: number; totalQty: number }> = {}
+    for (const tx of transactions) {
+      if (tx.type !== 'saida' || !tx.talhoes?.id) continue
+      const tid = tx.talhoes.id
+      if (!result[tid]) result[tid] = { accumArea: 0, totalQty: 0 }
+      result[tid].totalQty += Number(tx.quantity)
+      if ((tx as any).area_ha != null && Number((tx as any).area_ha) > 0) {
+        result[tid].accumArea += Number((tx as any).area_ha)
+      }
+    }
+    return result
+  }, [transactions])
+
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'insumos',   label: 'Insumos',   count: insumos.length },
     { id: 'talhoes',   label: 'Talhões',   count: talhoes.length },
@@ -201,18 +216,28 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             />
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-800">
-              <table className="w-full text-sm" style={{ minWidth: '520px' }}>
+              <table className="w-full text-sm" style={{ minWidth: '680px' }}>
                 <thead>
                   <tr className="border-b border-gray-800 bg-gray-900/60">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nome do Talhão</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Talhão</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Área (ha)</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumos Utilizados</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      <span className="text-green-500/70">Aplic. acum.</span>
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      <span className="text-green-500/70">Média kg/ha</span>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumos</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody>
                   {talhoes.map((t) => {
-                    const usage = talhaoUsage[t.id] ?? []
+                    const usage    = talhaoUsage[t.id] ?? []
+                    const areaStat = talhaoAreaStats[t.id]
+                    const avgKgHa  = areaStat && areaStat.accumArea > 0
+                      ? areaStat.totalQty / areaStat.accumArea
+                      : null
                     return (
                       <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
                         <td className="px-4 py-3">
@@ -224,11 +249,29 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-gray-400 whitespace-nowrap">
-                          {Number(t.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
+                          {Number(t.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+                          {areaStat && areaStat.accumArea > 0 ? (
+                            <span className="text-green-400/80">
+                              {areaStat.accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
+                            </span>
+                          ) : (
+                            <span className="text-gray-700">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+                          {avgKgHa != null ? (
+                            <span className="text-gray-300">
+                              {avgKgHa.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-700">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {usage.length === 0 ? (
-                            <span className="text-xs text-gray-700">Sem retiradas</span>
+                            <span className="text-xs text-gray-700">—</span>
                           ) : (
                             <div className="flex flex-wrap gap-x-4 gap-y-0.5">
                               {usage.map((s) => (

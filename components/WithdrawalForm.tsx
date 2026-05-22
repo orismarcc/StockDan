@@ -24,19 +24,27 @@ interface Talhao {
   area_ha: number
 }
 
+interface TalhaoStat {
+  accumArea: number
+  lastKgHa: number | null
+  lastDate: string | null
+}
+
 interface WithdrawalFormProps {
   farmId: string
   insumos: Insumo[]
   talhoes: Talhao[]
+  talhaoStats?: Record<string, TalhaoStat>
 }
 
-export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps) {
+export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {} }: WithdrawalFormProps) {
   const router   = useRouter()
   const isOnline = useOnlineStatus()
 
   const [insumoId,  setInsumoId]  = useState('')
   const [talhaoId,  setTalhaoId]  = useState('')
   const [quantity,  setQuantity]  = useState('')
+  const [areaHa,    setAreaHa]    = useState('')
   const [date,      setDate]      = useState(todayISO())
   const [notes,     setNotes]     = useState('')
   const [error,     setError]     = useState('')
@@ -57,8 +65,10 @@ export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps
     )
   }, [farmId, insumos])
 
-  const selectedInsumo = insumos.find((i) => i.id === insumoId)
-  const availableQty   = insumoId ? (localQtys[insumoId] ?? 0) : 0
+  const selectedInsumo  = insumos.find((i) => i.id === insumoId)
+  const availableQty    = insumoId ? (localQtys[insumoId] ?? 0) : 0
+  const selectedTalhao  = talhoes.find((t) => t.id === talhaoId)
+  const selectedTalhaoStat = talhaoId ? talhaoStats[talhaoId] : null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -82,14 +92,18 @@ export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps
 
     setLoading(true)
 
+    const area = areaHa ? parseFloat(areaHa.replace(',', '.')) : null
+    const areaPayload = area != null && area > 0 ? area : null
+
     if (!isOnline) {
       // Modo offline: enfileira e atualiza cache local
-      offlineQueue.add({ farm_id: farmId, insumo_id: insumoId, talhao_id: talhaoId, quantity: qty, date, notes: notes || null })
+      offlineQueue.add({ farm_id: farmId, insumo_id: insumoId, talhao_id: talhaoId, quantity: qty, date, notes: notes || null, area_ha: areaPayload })
       insumoCache.decreaseQuantity(farmId, insumoId, qty)
       setLocalQtys((prev) => ({ ...prev, [insumoId]: Math.max(0, (prev[insumoId] ?? 0) - qty) }))
       setLoading(false)
       setOfflineOk(true)
       setQuantity('')
+      setAreaHa('')
       setNotes('')
       return
     }
@@ -98,7 +112,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps
     const res = await fetch(`/api/farms/${farmId}/transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ insumo_id: insumoId, talhao_id: talhaoId, quantity: qty, date, notes }),
+      body: JSON.stringify({ insumo_id: insumoId, talhao_id: talhaoId, quantity: qty, date, notes, area_ha: areaPayload }),
     })
 
     const data = await res.json()
@@ -178,19 +192,91 @@ export function WithdrawalForm({ farmId, insumos, talhoes }: WithdrawalFormProps
           disabled={!insumoId}
         />
 
-        <Select
-          label="Talhão de destino *"
-          value={talhaoId}
-          onChange={(e) => setTalhaoId(e.target.value)}
-          required
-        >
-          <option value="">Selecione o talhão</option>
-          {talhoes.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} ({Number(t.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha)
-            </option>
-          ))}
-        </Select>
+        {/* Talhão + preview */}
+        <div className="flex flex-col gap-2">
+          <Select
+            label="Talhão de destino *"
+            value={talhaoId}
+            onChange={(e) => setTalhaoId(e.target.value)}
+            required
+          >
+            <option value="">Selecione o talhão</option>
+            {talhoes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({Number(t.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha)
+              </option>
+            ))}
+          </Select>
+
+          {/* Preview do talhão selecionado */}
+          {selectedTalhao && (
+            <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 px-3 py-2.5 text-xs">
+              <p className="mb-1.5 font-medium text-gray-400">{selectedTalhao.name} — situação atual</p>
+              <div className="flex flex-wrap gap-x-5 gap-y-1">
+                <span className="text-gray-500">
+                  Área cadastrada:{' '}
+                  <span className="text-gray-300">
+                    {Number(selectedTalhao.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
+                  </span>
+                </span>
+                {selectedTalhaoStat && selectedTalhaoStat.accumArea > 0 ? (
+                  <>
+                    <span className="text-gray-500">
+                      Já aplicado:{' '}
+                      <span className="font-medium text-green-400">
+                        {selectedTalhaoStat.accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
+                      </span>
+                    </span>
+                    {selectedTalhaoStat.lastKgHa != null && (
+                      <span className="text-gray-500">
+                        Última aplicação:{' '}
+                        <span className="text-gray-300">
+                          {selectedTalhaoStat.lastKgHa.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
+                        </span>
+                        {selectedTalhaoStat.lastDate && (
+                          <span className="text-gray-600 ml-1">
+                            ({new Date(selectedTalhaoStat.lastDate + 'T12:00:00').toLocaleDateString('pt-BR')})
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-gray-600 italic">Nenhuma área registrada ainda</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Área aplicada (opcional) */}
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-400">
+            Área a ser aplicada
+            <span className="ml-1.5 text-xs font-normal text-gray-600">(opcional — pode preencher após a operação)</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={areaHa}
+              onChange={(e) => setAreaHa(e.target.value)}
+              placeholder="0,00"
+              className="w-full rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-green-500/60 focus:outline-none"
+            />
+            <span className="shrink-0 text-sm text-gray-500">ha</span>
+          </div>
+          {/* Preview kg/ha se quantidade e área preenchidas */}
+          {quantity && areaHa && Number(quantity) > 0 && parseFloat(areaHa.replace(',', '.')) > 0 && (
+            <p className="text-xs text-gray-500">
+              Taxa desta aplicação:{' '}
+              <span className="font-medium text-green-400">
+                {(Number(quantity) / parseFloat(areaHa.replace(',', '.'))).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
+              </span>
+            </p>
+          )}
+        </div>
 
         <Input
           label="Data *"

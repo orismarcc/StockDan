@@ -124,7 +124,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
       return
     }
 
-    router.back()
+    router.push(`/farms/${farmId}`)
   }
 
   if (insumos.length === 0 || talhoes.length === 0) {
@@ -275,7 +275,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
             <p className="text-xs text-gray-500">
               Taxa desta aplicação:{' '}
               <span className="font-medium text-green-400">
-                {(Number(quantity) / parseFloat(areaHa.replace(',', '.'))).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
+                {((Number(quantity) * (selectedInsumo?.unit === 'bag' ? 1000 : 1)) / parseFloat(areaHa.replace(',', '.'))).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
               </span>
             </p>
           )}

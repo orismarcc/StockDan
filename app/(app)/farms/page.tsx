@@ -12,7 +12,7 @@ async function getFarmsWithStats(userId: string, role: string) {
   let farmsData: any[] = []
 
   if (role === 'admin') {
-    const { data } = await supabase.from('farms').select('*').order('name')
+    const { data } = await supabase.from('farms').select('*').eq('owner_id', userId).order('name')
     farmsData = data ?? []
   } else {
     const { data } = await supabase

@@ -62,7 +62,9 @@ export default async function TalhaoDetailPage({
 
   const txEnriched = rawList.map((tx) => {
     const insumoTitle: string = (tx.insumos as any)?.title ?? 'Desconhecido'
+    const unit = ((tx.insumos as any)?.unit ?? 'kg') as 'kg' | 'bag'
     const qty = Number(tx.quantity)
+    const qtyKg = unit === 'bag' ? qty * 1000 : qty
     const area = tx.area_ha != null ? Number(tx.area_ha) : null
 
     const prevAccum = accumByInsumo[insumoTitle] ?? 0
@@ -72,12 +74,12 @@ export default async function TalhaoDetailPage({
     return {
       ...tx,
       _insumoTitle: insumoTitle,
-      _insumoUnit: ((tx.insumos as any)?.unit ?? 'kg') as 'kg' | 'bag',
+      _insumoUnit: unit,
       _qty: qty,
       _area: area,
       _prevAccum: prevAccum,
       _accumArea: newAccum,
-      _kgHa: area != null && area > 0 ? qty / area : null,
+      _kgHa: area != null && area > 0 ? qtyKg / area : null,
     }
   })
 
@@ -97,9 +99,10 @@ export default async function TalhaoDetailPage({
   for (const tx of txEnriched) {
     const key = tx._insumoTitle
     if (!summaryMap[key]) {
-      summaryMap[key] = { title: key, unit: tx._insumoUnit, totalQty: 0, count: 0, totalArea: 0, hasArea: false }
+      summaryMap[key] = { title: key, unit: tx._insumoUnit, totalQty: 0, totalQtyKg: 0, count: 0, totalArea: 0, hasArea: false }
     }
     summaryMap[key].totalQty += tx._qty
+    summaryMap[key].totalQtyKg = (summaryMap[key].totalQtyKg ?? 0) + (tx._insumoUnit === 'bag' ? tx._qty * 1000 : tx._qty)
     summaryMap[key].count += 1
     if (tx._area != null) {
       summaryMap[key].totalArea += tx._area

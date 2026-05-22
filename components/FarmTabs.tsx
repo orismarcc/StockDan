@@ -32,38 +32,41 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
   const [tab, setTab] = useState<TabId>('talhoes')
   const [addStockFor, setAddStockFor] = useState<{ id: string; title: string; unit: 'kg' | 'bag' } | null>(null)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
+  const [editQtyFor, setEditQtyFor] = useState<{ id: string; title: string; unit: 'kg' | 'bag'; currentQty: number } | null>(null)
   const router = useRouter()
 
-  // Insumos usados por talhão
-  const talhaoUsage = useMemo(() => {
-    const result: Record<string, { title: string; unit: 'kg' | 'bag'; total: number }[]> = {}
+  // Área acumulada por insumo por talhão
+  const talhaoInsumoStats = useMemo(() => {
+    const result: Record<string, Record<string, { accumArea: number; totalQtyKg: number; txCount: number }>> = {}
     for (const tx of transactions) {
       if (tx.type !== 'saida' || !tx.talhoes?.id || !tx.insumos) continue
       const tid = tx.talhoes.id
-      if (!result[tid]) result[tid] = []
-      const existing = result[tid].find((s) => s.title === tx.insumos!.title)
-      if (existing) {
-        existing.total += Number(tx.quantity)
-      } else {
-        result[tid].push({ title: tx.insumos.title, unit: tx.insumos.unit, total: Number(tx.quantity) })
-      }
+      const insumoTitle = tx.insumos.title
+      const unit = tx.insumos.unit as 'kg' | 'bag'
+      const qty = Number(tx.quantity)
+      const qtyKg = unit === 'bag' ? qty * 1000 : qty
+      const areaHa = (tx as any).area_ha != null && Number((tx as any).area_ha) > 0
+        ? Number((tx as any).area_ha) : 0
+      if (!result[tid]) result[tid] = {}
+      if (!result[tid][insumoTitle]) result[tid][insumoTitle] = { accumArea: 0, totalQtyKg: 0, txCount: 0 }
+      result[tid][insumoTitle].accumArea += areaHa
+      result[tid][insumoTitle].totalQtyKg += qtyKg
+      result[tid][insumoTitle].txCount += 1
     }
     return result
   }, [transactions])
 
-  // Área acumulada e média kg/ha por talhão
-  const talhaoAreaStats = useMemo(() => {
-    const result: Record<string, { accumArea: number; totalQty: number }> = {}
+  // Top 3 insumos mais usados (por nº de transações) na fazenda
+  const topInsumos = useMemo(() => {
+    const counts: Record<string, number> = {}
     for (const tx of transactions) {
-      if (tx.type !== 'saida' || !tx.talhoes?.id) continue
-      const tid = tx.talhoes.id
-      if (!result[tid]) result[tid] = { accumArea: 0, totalQty: 0 }
-      result[tid].totalQty += Number(tx.quantity)
-      if ((tx as any).area_ha != null && Number((tx as any).area_ha) > 0) {
-        result[tid].accumArea += Number((tx as any).area_ha)
-      }
+      if (tx.type !== 'saida' || !tx.insumos) continue
+      counts[tx.insumos.title] = (counts[tx.insumos.title] ?? 0) + 1
     }
-    return result
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([title]) => title)
   }, [transactions])
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
@@ -127,21 +130,16 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <>
               {/* Desktop table */}
               <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-800">
-                <table className="w-full text-sm" style={{ minWidth: '740px' }}>
+                <table className="w-full text-sm" style={{ minWidth: topInsumos.length > 0 ? `${640 + topInsumos.length * 130}px` : '560px' }}>
                   <thead>
                     <tr className="border-b border-gray-800 bg-gray-900/60">
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Talhão</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Área (ha)</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        <span className="text-green-500/70">Aplic. acum.</span>
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" style={{ minWidth: '130px' }}>
-                        <span className="text-green-500/70">% Aplicada</span>
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        <span className="text-green-500/70">Média kg/ha</span>
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumos</th>
+                      {topInsumos.map((ins) => (
+                        <th key={ins} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" style={{ minWidth: '130px' }}>
+                          <span className="text-green-500/70 truncate block max-w-[120px]" title={`% ${ins}`}>% {ins}</span>
+                        </th>
+                      ))}
                       <th className="px-4 py-3" />
                     </tr>
                   </thead>
@@ -151,8 +149,8 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                         key={t.id}
                         talhao={t}
                         farmId={farm.id}
-                        usage={talhaoUsage[t.id] ?? []}
-                        areaStat={talhaoAreaStats[t.id]}
+                        insumoStats={talhaoInsumoStats[t.id] ?? {}}
+                        topInsumos={topInsumos}
                         userRole={userRole}
                         onDeleted={() => router.refresh()}
                       />
@@ -168,7 +166,8 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                     key={t.id}
                     talhao={t}
                     farmId={farm.id}
-                    areaStat={talhaoAreaStats[t.id]}
+                    insumoStats={talhaoInsumoStats[t.id] ?? {}}
+                    topInsumos={topInsumos}
                     userRole={userRole}
                     onDeleted={() => router.refresh()}
                   />
@@ -208,7 +207,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <>
               {/* Desktop table */}
               <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-800">
-                <table className="w-full text-sm" style={{ minWidth: '540px' }}>
+                <table className="w-full text-sm" style={{ minWidth: '560px' }}>
                   <thead>
                     <tr className="border-b border-gray-800 bg-gray-900/60">
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumo</th>
@@ -226,6 +225,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                         farmId={farm.id}
                         userRole={userRole}
                         onAddStock={() => setAddStockFor({ id: ins.id, title: ins.title, unit: ins.unit })}
+                        onEditQty={() => setEditQtyFor({ id: ins.id, title: ins.title, unit: ins.unit, currentQty: ins.quantity })}
                         onDeleted={() => router.refresh()}
                       />
                     ))}
@@ -242,6 +242,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                     farmId={farm.id}
                     userRole={userRole}
                     onAddStock={() => setAddStockFor({ id: ins.id, title: ins.title, unit: ins.unit })}
+                    onEditQty={() => setEditQtyFor({ id: ins.id, title: ins.title, unit: ins.unit, currentQty: ins.quantity })}
                     onDeleted={() => router.refresh()}
                   />
                 ))}
@@ -277,6 +278,18 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
         />
       )}
 
+      {editQtyFor && (
+        <AdjustQuantityModal
+          farmId={farm.id}
+          insumoId={editQtyFor.id}
+          insumoTitle={editQtyFor.title}
+          unit={editQtyFor.unit}
+          currentQty={editQtyFor.currentQty}
+          onClose={() => setEditQtyFor(null)}
+          onSuccess={() => { setEditQtyFor(null); router.refresh() }}
+        />
+      )}
+
       {editTx && (
         <EditTransactionModal
           farmId={farm.id}
@@ -292,28 +305,29 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
 
 // ─── TalhaoRow (desktop) ─────────────────────────────────────────────────────
 
+function pctBarColor(pct: number) {
+  return pct >= 100 ? 'bg-blue-500' : pct >= 75 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : 'bg-orange-500'
+}
+function pctTextColor(pct: number) {
+  return pct >= 100 ? 'text-blue-400' : pct >= 75 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-orange-400'
+}
+
 function TalhaoRow({
   talhao: t,
   farmId,
-  usage,
-  areaStat,
+  insumoStats,
+  topInsumos,
   userRole,
   onDeleted,
 }: {
   talhao: Talhao
   farmId: string
-  usage: { title: string; unit: 'kg' | 'bag'; total: number }[]
-  areaStat?: { accumArea: number; totalQty: number }
+  insumoStats: Record<string, { accumArea: number; totalQtyKg: number; txCount: number }>
+  topInsumos: string[]
   userRole: 'admin' | 'operario'
   onDeleted: () => void
 }) {
-  const areaHa    = Number(t.area_ha)
-  const accumArea = areaStat?.accumArea ?? 0
-  const pct       = areaHa > 0 && accumArea > 0 ? Math.min(100, (accumArea / areaHa) * 100) : null
-  const avgKgHa   = areaStat && areaStat.accumArea > 0 ? areaStat.totalQty / areaStat.accumArea : null
-
-  const pctBar  = pct == null ? '' : pct >= 100 ? 'bg-blue-500' : pct >= 75 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : 'bg-orange-500'
-  const pctText = pct == null ? '' : pct >= 100 ? 'text-blue-400' : pct >= 75 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-orange-400'
+  const areaHa = Number(t.area_ha)
 
   return (
     <tr className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
@@ -325,41 +339,28 @@ function TalhaoRow({
       <td className="px-4 py-3 text-right font-mono text-gray-400 whitespace-nowrap">
         {areaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
       </td>
-      <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
-        {accumArea > 0
-          ? <span className="text-green-400/80">{accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha</span>
-          : <span className="text-gray-700">—</span>}
-      </td>
-      <td className="px-4 py-3" style={{ minWidth: '130px' }}>
-        {pct != null ? (
-          <div className="flex items-center gap-2">
-            <div className="h-1.5 flex-1 rounded-full bg-gray-800 overflow-hidden">
-              <div className={cn('h-full rounded-full', pctBar)} style={{ width: `${pct}%` }} />
-            </div>
-            <span className={cn('text-xs font-medium tabular-nums shrink-0', pctText)}>
-              {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
-            </span>
-          </div>
-        ) : <span className="text-xs text-gray-700">—</span>}
-      </td>
-      <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
-        {avgKgHa != null
-          ? <span className="text-gray-300">{avgKgHa.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
-          : <span className="text-gray-700">—</span>}
-      </td>
-      <td className="px-4 py-3">
-        {usage.length === 0 ? (
-          <span className="text-xs text-gray-700">—</span>
-        ) : (
-          <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-            {usage.map((s) => (
-              <span key={s.title} className="text-xs text-gray-400">
-                {s.title}: <span className="font-medium text-gray-300">{formatQuantity(s.total, s.unit)}</span>
-              </span>
-            ))}
-          </div>
-        )}
-      </td>
+      {topInsumos.map((insumoTitle) => {
+        const stat = insumoStats[insumoTitle]
+        const pct = stat && areaHa > 0 && stat.accumArea > 0
+          ? Math.min(100, (stat.accumArea / areaHa) * 100)
+          : null
+        return (
+          <td key={insumoTitle} className="px-4 py-3" style={{ minWidth: '130px' }}>
+            {pct != null ? (
+              <div className="flex items-center gap-1.5">
+                <div className="h-1.5 flex-1 rounded-full bg-gray-800 overflow-hidden">
+                  <div className={cn('h-full rounded-full', pctBarColor(pct))} style={{ width: `${pct}%` }} />
+                </div>
+                <span className={cn('text-xs font-medium tabular-nums shrink-0 w-10 text-right', pctTextColor(pct))}>
+                  {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-700">—</span>
+            )}
+          </td>
+        )
+      })}
       <td className="px-4 py-3 text-right whitespace-nowrap">
         <div className="flex items-center justify-end gap-2">
           <Link
@@ -394,21 +395,29 @@ function TalhaoRow({
 function TalhaoCard({
   talhao: t,
   farmId,
-  areaStat,
+  insumoStats,
+  topInsumos,
   userRole,
   onDeleted,
 }: {
   talhao: Talhao
   farmId: string
-  areaStat?: { accumArea: number; totalQty: number }
+  insumoStats: Record<string, { accumArea: number; totalQtyKg: number; txCount: number }>
+  topInsumos: string[]
   userRole: 'admin' | 'operario'
   onDeleted: () => void
 }) {
-  const areaHa    = Number(t.area_ha)
-  const accumArea = areaStat?.accumArea ?? 0
-  const pct       = areaHa > 0 && accumArea > 0 ? Math.min(100, (accumArea / areaHa) * 100) : null
-  const pctBar  = pct == null ? '' : pct >= 100 ? 'bg-blue-500' : pct >= 75 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : 'bg-orange-500'
-  const pctText = pct == null ? '' : pct >= 100 ? 'text-blue-400' : pct >= 75 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-orange-400'
+  const areaHa = Number(t.area_ha)
+
+  // Per-insumo % for this talhão
+  const insumoPercentages = topInsumos
+    .map((title) => {
+      const stat = insumoStats[title]
+      if (!stat || areaHa <= 0 || stat.accumArea <= 0) return null
+      const pct = Math.min(100, (stat.accumArea / areaHa) * 100)
+      return { title, pct }
+    })
+    .filter(Boolean) as { title: string; pct: number }[]
 
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
@@ -421,23 +430,25 @@ function TalhaoCard({
             {areaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha cadastrados
           </p>
         </div>
-        {pct != null && (
-          <span className={cn('text-sm font-bold tabular-nums shrink-0', pctText)}>
-            {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
-          </span>
-        )}
       </div>
 
-      {pct != null && (
-        <div className="mt-3 h-2 w-full rounded-full bg-gray-800 overflow-hidden">
-          <div className={cn('h-full rounded-full', pctBar)} style={{ width: `${pct}%` }} />
+      {/* Per-insumo percentages */}
+      {insumoPercentages.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1.5">
+          {insumoPercentages.map(({ title, pct }) => (
+            <div key={title} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-xs text-gray-500">{title}</span>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <div className="h-1.5 w-14 overflow-hidden rounded-full bg-gray-800">
+                  <div className={cn('h-full rounded-full', pctBarColor(pct))} style={{ width: `${pct}%` }} />
+                </div>
+                <span className={cn('w-10 text-right text-xs font-medium tabular-nums', pctTextColor(pct))}>
+                  {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
-      )}
-
-      {accumArea > 0 && (
-        <p className="mt-2 text-xs text-green-400/70">
-          {accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha aplicados
-        </p>
       )}
 
       <div className="mt-3 flex items-center gap-2">
@@ -474,12 +485,14 @@ function InsumoRow({
   farmId,
   userRole,
   onAddStock,
+  onEditQty,
   onDeleted,
 }: {
   ins: any
   farmId: string
   userRole: 'admin' | 'operario'
   onAddStock: () => void
+  onEditQty: () => void
   onDeleted: () => void
 }) {
   return (
@@ -502,12 +515,24 @@ function InsumoRow({
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-2 flex-wrap">
           {userRole === 'admin' && (
-            <button
-              onClick={onAddStock}
-              className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 hover:border-green-500/50 hover:bg-green-500/20 transition-colors whitespace-nowrap"
-            >
-              + Estoque
-            </button>
+            <>
+              <button
+                onClick={onAddStock}
+                className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 hover:border-green-500/50 hover:bg-green-500/20 transition-colors whitespace-nowrap"
+              >
+                + Estoque
+              </button>
+              <button
+                onClick={onEditQty}
+                title="Ajustar quantidade"
+                className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2 py-1 text-xs text-gray-400 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
+                Ajustar
+              </button>
+            </>
           )}
           <Link
             href={`/farms/${farmId}/insumos/${ins.id}`}
@@ -537,12 +562,14 @@ function InsumoCard({
   farmId,
   userRole,
   onAddStock,
+  onEditQty,
   onDeleted,
 }: {
   ins: any
   farmId: string
   userRole: 'admin' | 'operario'
   onAddStock: () => void
+  onEditQty: () => void
   onDeleted: () => void
 }) {
   return (
@@ -566,12 +593,23 @@ function InsumoCard({
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">
         {userRole === 'admin' && (
-          <button
-            onClick={onAddStock}
-            className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm font-medium text-green-400 hover:bg-green-500/20 transition-colors"
-          >
-            + Estoque
-          </button>
+          <>
+            <button
+              onClick={onAddStock}
+              className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+            >
+              + Estoque
+            </button>
+            <button
+              onClick={onEditQty}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              </svg>
+              Ajustar
+            </button>
+          </>
         )}
         <Link
           href={`/farms/${farmId}/insumos/${ins.id}`}
@@ -589,6 +627,94 @@ function InsumoCard({
             className="rounded-lg border border-red-500/20 bg-red-500/8 px-4 py-2 text-sm font-medium text-red-400/80 hover:border-red-500/40 hover:bg-red-500/15 hover:text-red-400 transition-colors"
           />
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─── AdjustQuantityModal ─────────────────────────────────────────────────────
+
+function AdjustQuantityModal({
+  farmId,
+  insumoId,
+  insumoTitle,
+  unit,
+  currentQty,
+  onClose,
+  onSuccess,
+}: {
+  farmId: string
+  insumoId: string
+  insumoTitle: string
+  unit: 'kg' | 'bag'
+  currentQty: number
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [newQty, setNewQty] = useState(String(currentQty))
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const unitLabel = unit === 'bag' ? 'bags' : 'kg'
+
+  async function handleSave() {
+    const qty = Number(newQty)
+    if (isNaN(qty) || qty < 0) { setError('Quantidade inválida.'); return }
+    setLoading(true); setError('')
+    const res = await fetch(`/api/farms/${farmId}/insumos/${insumoId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quantity: qty }),
+    })
+    setLoading(false)
+    if (!res.ok) { setError('Falha ao salvar.'); return }
+    onSuccess()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-xl">
+        <h3 className="mb-1 text-base font-semibold text-gray-100">Ajustar Estoque</h3>
+        <p className="mb-5 text-xs text-gray-500 truncate">{insumoTitle}</p>
+
+        <div className="mb-4">
+          <label className="mb-1.5 block text-sm font-medium text-gray-400">
+            Nova quantidade ({unitLabel})
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              step="0.001"
+              value={newQty}
+              onChange={(e) => setNewQty(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2.5 text-sm text-gray-100 focus:border-green-500/60 focus:outline-none"
+              autoFocus
+            />
+            <span className="shrink-0 text-sm text-gray-500">{unitLabel}</span>
+          </div>
+          <p className="mt-1 text-xs text-gray-600">
+            Atual: <span className="text-gray-400">{formatQuantity(currentQty, unit)}</span>
+          </p>
+        </div>
+
+        {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Salvando…' : 'Salvar'}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-300 hover:text-gray-100 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
       </div>
     </div>
   )

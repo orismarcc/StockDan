@@ -28,16 +28,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { iid } = await params
   const body = await req.json()
-  const { title, description, min_quantity } = body
+  const { title, description, min_quantity, quantity } = body
+
+  const updateData: Record<string, any> = {
+    title,
+    description: description || null,
+    min_quantity: min_quantity != null ? Number(min_quantity) : null,
+  }
+  if (quantity != null) updateData.quantity = Number(quantity)
 
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('insumos')
-    .update({
-      title,
-      description: description || null,
-      min_quantity: min_quantity != null ? Number(min_quantity) : null,
-    })
+    .update(updateData)
     .eq('id', iid)
     .select()
     .single()

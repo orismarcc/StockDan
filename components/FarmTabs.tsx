@@ -28,7 +28,7 @@ interface FarmTabsProps {
 }
 
 export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: FarmTabsProps) {
-  const [tab, setTab] = useState<TabId>('insumos')
+  const [tab, setTab] = useState<TabId>('talhoes')
   const [addStockFor, setAddStockFor] = useState<{ id: string; title: string; unit: 'kg' | 'bag' } | null>(null)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const router = useRouter()
@@ -66,8 +66,8 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
   }, [transactions])
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
-    { id: 'insumos',   label: 'Insumos',   count: insumos.length },
     { id: 'talhoes',   label: 'Talhões',   count: talhoes.length },
+    { id: 'insumos',   label: 'Insumos',   count: insumos.length },
     { id: 'historico', label: 'Histórico', count: transactions.length },
   ]
 
@@ -206,13 +206,16 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             />
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-800">
-              <table className="w-full text-sm" style={{ minWidth: '680px' }}>
+              <table className="w-full text-sm" style={{ minWidth: '740px' }}>
                 <thead>
                   <tr className="border-b border-gray-800 bg-gray-900/60">
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Talhão</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Área (ha)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
                       <span className="text-green-500/70">Aplic. acum.</span>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" style={{ minWidth: '130px' }}>
+                      <span className="text-green-500/70">% Aplicada</span>
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
                       <span className="text-green-500/70">Média kg/ha</span>
@@ -223,11 +226,25 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                 </thead>
                 <tbody>
                   {talhoes.map((t) => {
-                    const usage    = talhaoUsage[t.id] ?? []
-                    const areaStat = talhaoAreaStats[t.id]
-                    const avgKgHa  = areaStat && areaStat.accumArea > 0
+                    const usage      = talhaoUsage[t.id] ?? []
+                    const areaStat   = talhaoAreaStats[t.id]
+                    const areaHa     = Number(t.area_ha)
+                    const accumArea  = areaStat?.accumArea ?? 0
+                    const pct        = areaHa > 0 && accumArea > 0
+                      ? Math.min(100, (accumArea / areaHa) * 100)
+                      : null
+                    const avgKgHa    = areaStat && areaStat.accumArea > 0
                       ? areaStat.totalQty / areaStat.accumArea
                       : null
+                    const pctColor   = pct == null
+                      ? ''
+                      : pct >= 100
+                        ? 'bg-blue-500'
+                        : pct >= 75
+                          ? 'bg-green-500'
+                          : pct >= 40
+                            ? 'bg-yellow-500'
+                            : 'bg-orange-500'
                     return (
                       <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
                         <td className="px-4 py-3">
@@ -239,15 +256,37 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-gray-400 whitespace-nowrap">
-                          {Number(t.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {areaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
-                          {areaStat && areaStat.accumArea > 0 ? (
+                          {accumArea > 0 ? (
                             <span className="text-green-400/80">
-                              {areaStat.accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
+                              {accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
                             </span>
                           ) : (
                             <span className="text-gray-700">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {pct != null ? (
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="h-1.5 flex-1 rounded-full bg-gray-800 overflow-hidden">
+                                  <div
+                                    className={cn('h-full rounded-full transition-all', pctColor)}
+                                    style={{ width: `${Math.min(100, pct)}%` }}
+                                  />
+                                </div>
+                                <span className={cn(
+                                  'text-xs font-medium tabular-nums shrink-0',
+                                  pct >= 100 ? 'text-blue-400' : pct >= 75 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-orange-400'
+                                )}>
+                                  {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-700">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right font-mono whitespace-nowrap">

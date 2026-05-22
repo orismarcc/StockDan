@@ -7,9 +7,7 @@ type Params = { params: Promise<{ id: string; tid: string }> }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await getSession()
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
-  }
+  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
   const { id: farm_id, tid } = await params
   const supabase = createServerClient()
@@ -19,7 +17,31 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const body = await req.json()
-  const { quantity, date, talhao_id, notes } = body
+  const { quantity, date, talhao_id, notes, area_ha } = body
+
+  // ── Atualização de área aplicada ──────────────────────────────────────────
+  // Qualquer usuário com acesso à fazenda pode registrar a área.
+  // Não toca no estoque.
+  if (area_ha !== undefined && quantity === undefined && date === undefined) {
+    const ha = Number(area_ha)
+    if (isNaN(ha) || ha <= 0) {
+      return NextResponse.json({ error: 'Área deve ser maior que zero.' }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from('transactions')
+      .update({ area_ha: ha })
+      .eq('id', tid)
+      .eq('farm_id', farm_id)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  // ── Edição completa (quantidade / data / talhão) — somente admin ──────────
+  if (session.role !== 'admin') {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
 
   if (!quantity || Number(quantity) <= 0 || !date) {
     return NextResponse.json({ error: 'Quantidade e data são obrigatórios.' }, { status: 400 })
@@ -46,7 +68,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const newQty = Number(quantity)
   const currentStock = Number(insumo.quantity)
 
-  // Reverse original effect and apply new effect
   const newStock = tx.type === 'saida'
     ? currentStock + origQty - newQty
     : currentStock - origQty + newQty

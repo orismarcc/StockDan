@@ -35,14 +35,15 @@ interface WithdrawalFormProps {
   insumos: Insumo[]
   talhoes: Talhao[]
   talhaoStats?: Record<string, TalhaoStat>
+  initialTalhaoId?: string
 }
 
-export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {} }: WithdrawalFormProps) {
+export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, initialTalhaoId = '' }: WithdrawalFormProps) {
   const router   = useRouter()
   const isOnline = useOnlineStatus()
 
   const [insumoId,  setInsumoId]  = useState('')
-  const [talhaoId,  setTalhaoId]  = useState('')
+  const [talhaoId,  setTalhaoId]  = useState(initialTalhaoId)
   const [quantity,  setQuantity]  = useState('')
   const [areaHa,    setAreaHa]    = useState('')
   const [date,      setDate]      = useState(todayISO())
@@ -238,7 +239,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {} }: W
 
         {/* Quantidade */}
         <Input
-          label={`Quantidade${selectedInsumo ? ` (${selectedInsumo.unit === 'bag' ? 'sacas' : 'kg'})` : ''} *`}
+          label={`Quantidade${selectedInsumo ? ` (${selectedInsumo.unit === 'bag' ? 'bags' : 'kg'})` : ''} *`}
           type="number"
           min="0.001"
           step="0.001"
@@ -246,7 +247,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {} }: W
           placeholder="0"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          hint={selectedInsumo?.unit === 'bag' ? '1 saca = 1.000 kg' : undefined}
+          hint={selectedInsumo?.unit === 'bag' ? '1 bag = 1.000 kg' : undefined}
           required
           disabled={!insumoId}
         />

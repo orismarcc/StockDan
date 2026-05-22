@@ -363,6 +363,12 @@ function TalhaoRow({
       <td className="px-4 py-3 text-right whitespace-nowrap">
         <div className="flex items-center justify-end gap-2">
           <Link
+            href={`/farms/${farmId}/retirada?talhao=${t.id}`}
+            className="inline-flex items-center gap-1 rounded-md border border-green-600/30 bg-green-600/10 px-2.5 py-1 text-xs font-medium text-green-400 hover:bg-green-600/20 transition-colors"
+          >
+            + Aplicação
+          </Link>
+          <Link
             href={`/farms/${farmId}/talhoes/${t.id}`}
             className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
           >
@@ -436,8 +442,14 @@ function TalhaoCard({
 
       <div className="mt-3 flex items-center gap-2">
         <Link
+          href={`/farms/${farmId}/retirada?talhao=${t.id}`}
+          className="flex-1 rounded-lg border border-green-600/30 bg-green-600/10 py-2.5 text-center text-sm font-medium text-green-400 hover:bg-green-600/20 transition-colors"
+        >
+          + Aplicação
+        </Link>
+        <Link
           href={`/farms/${farmId}/talhoes/${t.id}`}
-          className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 py-2 text-center text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-gray-100 transition-colors"
+          className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 py-2.5 text-center text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-gray-100 transition-colors"
         >
           Detalhes
         </Link>
@@ -448,7 +460,6 @@ function TalhaoCard({
               if (!res.ok) throw new Error('Falha ao apagar talhão')
               onDeleted()
             }}
-            className="rounded-lg border border-red-500/20 bg-red-500/8 px-4 py-2 text-sm font-medium text-red-400/80 hover:border-red-500/40 hover:bg-red-500/15 hover:text-red-400 transition-colors"
           />
         )}
       </div>

@@ -6,11 +6,18 @@ import Link from 'next/link'
 
 export const metadata = { title: 'Registrar Retirada' }
 
-export default async function RetiradaPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RetiradaPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ talhao?: string }>
+}) {
   const session = await getSession()
   if (!session) redirect('/login')
 
   const { id } = await params
+  const { talhao: initialTalhaoId } = await searchParams
   const supabase = createServerClient()
 
   const [{ data: farm }, { data: insumos }, { data: talhoes }, { data: txArea }] = await Promise.all([
@@ -72,6 +79,7 @@ export default async function RetiradaPage({ params }: { params: Promise<{ id: s
           insumos={insumos ?? []}
           talhoes={talhoes ?? []}
           talhaoStats={talhaoStats}
+          initialTalhaoId={initialTalhaoId ?? ''}
         />
       </div>
     </div>

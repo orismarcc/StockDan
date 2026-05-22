@@ -6,7 +6,7 @@ export function formatQuantity(value: number, unit: 'kg' | 'bag'): string {
   if (unit === 'bag') {
     const kg = value * 1000
     const kgFormatted = kg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })
-    return `${formatted} sc (${kgFormatted} kg)`
+    return `${formatted} ${value === 1 ? 'bag' : 'bags'} (${kgFormatted} kg)`
   }
   return `${formatted} kg`
 }

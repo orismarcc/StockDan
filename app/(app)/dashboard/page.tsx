@@ -28,28 +28,43 @@ async function getFarmsWithStats(userId: string, role: string) {
     farmsData = (data ?? []).map((r: any) => r.farms).filter(Boolean)
   }
 
-  // Para cada fazenda, busca contagem de insumos, talhões e status
+  // Para cada fazenda, busca contagem de insumos, talhões, área e status
   const farmsWithStats = await Promise.all(
     farmsData.map(async (farm) => {
-      const [{ data: insumos }, { count: talhaoCount }] = await Promise.all([
+      const [{ data: insumos }, { data: talhaoRows }, { data: txAreas }] = await Promise.all([
         supabase.from('insumos').select('quantity, min_quantity').eq('farm_id', farm.id),
-        supabase.from('talhoes').select('*', { count: 'exact', head: true }).eq('farm_id', farm.id),
+        supabase.from('talhoes').select('area_ha').eq('farm_id', farm.id),
+        supabase
+          .from('transactions')
+          .select('area_ha')
+          .eq('farm_id', farm.id)
+          .eq('type', 'saida')
+          .not('area_ha', 'is', null),
       ])
 
-      const list = insumos ?? []
-      const emptyCount = list.filter((i: any) => Number(i.quantity) <= 0).length
-      const lowCount   = list.filter((i: any) =>
+      const list        = insumos ?? []
+      const emptyCount  = list.filter((i: any) => Number(i.quantity) <= 0).length
+      const lowCount    = list.filter((i: any) =>
         Number(i.quantity) > 0 &&
         i.min_quantity != null &&
         Number(i.quantity) <= Number(i.min_quantity)
       ).length
 
+      const totalAreaHa  = (talhaoRows ?? []).reduce((s, t) => s + Number(t.area_ha), 0)
+      const accumAreaHa  = (txAreas ?? []).reduce((s, t) => s + Number(t.area_ha), 0)
+      const pctApplied   = totalAreaHa > 0 && accumAreaHa > 0
+        ? Math.min(100, (accumAreaHa / totalAreaHa) * 100)
+        : null
+
       return {
         ...farm,
         insumoCount: list.length,
-        talhaoCount: talhaoCount ?? 0,
+        talhaoCount: (talhaoRows ?? []).length,
         emptyCount,
         lowCount,
+        totalAreaHa,
+        accumAreaHa,
+        pctApplied,
       }
     })
   )
@@ -114,10 +129,56 @@ export default async function DashboardPage() {
               talhaoCount={farm.talhaoCount}
               emptyCount={farm.emptyCount}
               lowCount={farm.lowCount}
+              totalAreaHa={farm.totalAreaHa}
+              accumAreaHa={farm.accumAreaHa}
+              pctApplied={farm.pctApplied}
             />
           ))}
         </div>
       )}
+
+      {/* Instruções de uso */}
+      <div className="mt-10 rounded-xl border border-gray-800 bg-gray-900/40 p-6">
+        <h2 className="mb-4 text-sm font-semibold text-gray-400 uppercase tracking-wider">Sobre o StockDan</h2>
+        <p className="mb-5 text-sm text-gray-500 leading-relaxed">
+          Sistema de gestão de insumos agrícolas — controle de estoque, retiradas por talhão e métricas de aplicação
+          (kg/ha, área acumulada, % da área coberta).
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              step: '1',
+              title: 'Cadastre a fazenda',
+              desc: 'Registre nome, produtor e localização. Adicione os talhões com a área em hectares de cada um.',
+            },
+            {
+              step: '2',
+              title: 'Adicione insumos',
+              desc: 'Cadastre os produtos (fertilizantes, defensivos etc.) e informe o estoque inicial em kg ou bags.',
+            },
+            {
+              step: '3',
+              title: 'Registre aplicações',
+              desc: 'Em cada talhão, clique em "+ Aplicação" para registrar a retirada de estoque com data e quantidade.',
+            },
+            {
+              step: '4',
+              title: 'Acompanhe métricas',
+              desc: 'Visualize o % da área coberta, kg/ha por talhão e o histórico completo de movimentações.',
+            },
+          ].map(({ step, title, desc }) => (
+            <div key={step} className="flex gap-3">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-500/15 text-xs font-bold text-green-400">
+                {step}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-300">{title}</p>
+                <p className="mt-1 text-xs text-gray-600 leading-relaxed">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

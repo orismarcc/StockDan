@@ -10,6 +10,9 @@ interface FarmCardProps {
   talhaoCount: number
   emptyCount: number
   lowCount: number
+  totalAreaHa?: number
+  accumAreaHa?: number
+  pctApplied?: number | null
 }
 
 export function FarmCard({
@@ -22,9 +25,24 @@ export function FarmCard({
   talhaoCount,
   emptyCount,
   lowCount,
+  totalAreaHa = 0,
+  accumAreaHa = 0,
+  pctApplied = null,
 }: FarmCardProps) {
-  const allOk = insumoCount > 0 && emptyCount === 0 && lowCount === 0
+  const allOk    = insumoCount > 0 && emptyCount === 0 && lowCount === 0
   const hasAlerts = emptyCount > 0 || lowCount > 0
+
+  const pctColor = pctApplied == null ? ''
+    : pctApplied >= 100 ? 'bg-blue-500'
+    : pctApplied >= 75  ? 'bg-green-500'
+    : pctApplied >= 40  ? 'bg-yellow-500'
+    : 'bg-orange-500'
+
+  const pctTextColor = pctApplied == null ? ''
+    : pctApplied >= 100 ? 'text-blue-400'
+    : pctApplied >= 75  ? 'text-green-400'
+    : pctApplied >= 40  ? 'text-yellow-400'
+    : 'text-orange-400'
 
   return (
     <Link
@@ -56,7 +74,7 @@ export function FarmCard({
           {city}, {state}
         </div>
 
-        {/* Stats */}
+        {/* Stats — insumos + talhões */}
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-gray-800 bg-gray-800/40 px-3 py-2.5">
             <p className="text-lg font-bold text-gray-100">{insumoCount}</p>
@@ -67,6 +85,40 @@ export function FarmCard({
             <p className="text-xs text-gray-500">{talhaoCount === 1 ? 'Talhão' : 'Talhões'}</p>
           </div>
         </div>
+
+        {/* Área total + % aplicada */}
+        {totalAreaHa > 0 && (
+          <div className="mt-3 rounded-lg border border-gray-800 bg-gray-800/30 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="text-xs text-gray-500">
+                Área total:{' '}
+                <span className="font-medium text-gray-300">
+                  {totalAreaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
+                </span>
+              </span>
+              {pctApplied != null ? (
+                <span className={`text-xs font-semibold tabular-nums ${pctTextColor}`}>
+                  {pctApplied.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% aplic.
+                </span>
+              ) : (
+                <span className="text-xs text-gray-700 italic">0% aplic.</span>
+              )}
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-gray-700 overflow-hidden">
+              {pctApplied != null && (
+                <div
+                  className={`h-full rounded-full ${pctColor}`}
+                  style={{ width: `${Math.min(100, pctApplied)}%` }}
+                />
+              )}
+            </div>
+            {accumAreaHa > 0 && (
+              <p className="mt-1 text-[11px] text-gray-600">
+                {accumAreaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha aplicados
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Alertas de estoque */}
         {insumoCount > 0 && (

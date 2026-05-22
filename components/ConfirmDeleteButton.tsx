@@ -4,17 +4,30 @@ import { useState } from 'react'
 
 interface Props {
   onConfirm: () => Promise<void>
-  label?: string
-  confirmLabel?: string
+  /** className override — padrão é ícone de lixeira pequeno */
   className?: string
+  /** Tamanho do ícone: 'sm' = h-4 w-4 (padrão), 'md' = h-5 w-5 */
+  iconSize?: 'sm' | 'md'
 }
 
-export function ConfirmDeleteButton({
-  onConfirm,
-  label = 'Apagar',
-  confirmLabel = 'Confirmar?',
-  className = '',
-}: Props) {
+const TrashIcon = ({ size = 'sm' }: { size?: 'sm' | 'md' }) => (
+  <svg
+    className={size === 'md' ? 'h-5 w-5' : 'h-4 w-4'}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+  </svg>
+)
+
+export function ConfirmDeleteButton({ onConfirm, className, iconSize = 'sm' }: Props) {
   const [step, setStep] = useState<'idle' | 'confirm' | 'loading'>('idle')
 
   async function handleConfirm() {
@@ -28,8 +41,8 @@ export function ConfirmDeleteButton({
 
   if (step === 'loading') {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-gray-500">
-        Apagando…
+      <span className={className ?? 'inline-flex items-center justify-center rounded-md p-1.5 text-red-400/40'}>
+        <TrashIcon size={iconSize} />
       </span>
     )
   }
@@ -37,7 +50,7 @@ export function ConfirmDeleteButton({
   if (step === 'confirm') {
     return (
       <span className="inline-flex items-center gap-1">
-        <span className="text-[11px] text-red-400 whitespace-nowrap mr-0.5">{confirmLabel}</span>
+        <span className="text-[11px] text-red-400 whitespace-nowrap">Confirmar?</span>
         <button
           onClick={handleConfirm}
           className="rounded border border-red-500/40 bg-red-500/15 px-2 py-1 text-[11px] font-semibold text-red-400 hover:bg-red-500/25 transition-colors"
@@ -57,12 +70,13 @@ export function ConfirmDeleteButton({
   return (
     <button
       onClick={() => setStep('confirm')}
+      title="Apagar"
       className={
-        className ||
-        'inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-red-500/8 px-2.5 py-1 text-xs font-medium text-red-400/80 hover:border-red-500/40 hover:bg-red-500/15 hover:text-red-400 transition-colors'
+        className ??
+        'inline-flex items-center justify-center rounded-md p-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-colors'
       }
     >
-      {label}
+      <TrashIcon size={iconSize} />
     </button>
   )
 }

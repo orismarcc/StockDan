@@ -10,7 +10,6 @@ interface FarmCardProps {
   talhaoCount: number
   emptyCount: number
   lowCount: number
-  unclaimed?: boolean
 }
 
 export function FarmCard({
@@ -23,7 +22,6 @@ export function FarmCard({
   talhaoCount,
   emptyCount,
   lowCount,
-  unclaimed = false,
 }: FarmCardProps) {
   const allOk = insumoCount > 0 && emptyCount === 0 && lowCount === 0
   const hasAlerts = emptyCount > 0 || lowCount > 0
@@ -101,9 +99,7 @@ export function FarmCard({
       {/* Rodapé CTA */}
       <div className="flex items-center justify-between border-t border-gray-800 bg-gray-900/60 px-5 py-3">
         <span className="text-xs text-gray-600">
-          {unclaimed
-            ? <span className="text-amber-500/80">Sem responsável</span>
-            : hasAlerts ? 'Requer atenção' : 'Ver detalhes'}
+          {hasAlerts ? 'Requer atenção' : 'Ver detalhes'}
         </span>
         <span className="flex items-center gap-1 text-xs font-medium text-gray-500 group-hover:text-green-400 transition-colors">
           Acessar

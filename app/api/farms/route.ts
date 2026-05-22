@@ -9,11 +9,11 @@ export async function GET() {
   const supabase = createServerClient()
 
   if (session.role === 'admin') {
-    // Admins veem suas próprias fazendas + fazendas sem dono (para reivindicação)
+    // Admins veem apenas suas próprias fazendas
     const { data, error } = await supabase
       .from('farms')
       .select('*')
-      .or(`owner_id.eq.${session.id},owner_id.is.null`)
+      .eq('owner_id', session.id)
       .order('name')
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

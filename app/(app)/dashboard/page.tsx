@@ -13,11 +13,11 @@ async function getFarmsWithStats(userId: string, role: string) {
   let farmsData: any[] = []
 
   if (role === 'admin') {
-    // Admins veem suas próprias fazendas + fazendas sem dono (para reivindicação)
+    // Admins veem apenas suas próprias fazendas
     const { data } = await supabase
       .from('farms')
       .select('*')
-      .or(`owner_id.eq.${userId},owner_id.is.null`)
+      .eq('owner_id', userId)
       .order('name')
     farmsData = data ?? []
   } else {
@@ -114,7 +114,6 @@ export default async function DashboardPage() {
               talhaoCount={farm.talhaoCount}
               emptyCount={farm.emptyCount}
               lowCount={farm.lowCount}
-              unclaimed={farm.owner_id === null}
             />
           ))}
         </div>

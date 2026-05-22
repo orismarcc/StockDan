@@ -8,9 +8,10 @@ import { StockBadge } from './StockBadge'
 import { TransactionTable, Transaction } from './TransactionTable'
 import { AddStockModal } from './AddStockModal'
 import { EditTransactionModal } from './EditTransactionModal'
+import { ConfirmDeleteButton } from './ConfirmDeleteButton'
 import { Button } from './ui/Button'
 
-type TabId = 'insumos' | 'talhoes' | 'historico'
+type TabId = 'talhoes' | 'insumos' | 'historico'
 
 interface Talhao {
   id: string
@@ -33,7 +34,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const router = useRouter()
 
-  // Compute per-talhão insumo usage totals from the transactions already loaded
+  // Insumos usados por talhão
   const talhaoUsage = useMemo(() => {
     const result: Record<string, { title: string; unit: 'kg' | 'bag'; total: number }[]> = {}
     for (const tx of transactions) {
@@ -80,7 +81,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             key={t.id}
             onClick={() => setTab(t.id)}
             className={cn(
-              'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              'flex-1 rounded-md px-2 py-2 text-sm font-medium transition-colors',
               tab === t.id
                 ? 'bg-gray-800 text-gray-100 shadow-sm'
                 : 'text-gray-500 hover:text-gray-300'
@@ -99,7 +100,86 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
         ))}
       </div>
 
-      {/* Insumos */}
+      {/* ── Talhões ──────────────────────────────────────────────────────── */}
+      {tab === 'talhoes' && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm text-gray-500">{talhoes.length} talhão(ões) cadastrado(s)</p>
+            {userRole === 'admin' && (
+              <Link href={`/farms/${farm.id}/talhoes`}>
+                <Button size="sm">
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                  </svg>
+                  Gerenciar Talhões
+                </Button>
+              </Link>
+            )}
+          </div>
+
+          {talhoes.length === 0 ? (
+            <EmptyState
+              icon="map"
+              message="Nenhum talhão cadastrado"
+              action={userRole === 'admin' ? { label: 'Gerenciar talhões', href: `/farms/${farm.id}/talhoes` } : undefined}
+            />
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-800">
+                <table className="w-full text-sm" style={{ minWidth: '740px' }}>
+                  <thead>
+                    <tr className="border-b border-gray-800 bg-gray-900/60">
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Talhão</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Área (ha)</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+                        <span className="text-green-500/70">Aplic. acum.</span>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" style={{ minWidth: '130px' }}>
+                        <span className="text-green-500/70">% Aplicada</span>
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+                        <span className="text-green-500/70">Média kg/ha</span>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumos</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {talhoes.map((t) => (
+                      <TalhaoRow
+                        key={t.id}
+                        talhao={t}
+                        farmId={farm.id}
+                        usage={talhaoUsage[t.id] ?? []}
+                        areaStat={talhaoAreaStats[t.id]}
+                        userRole={userRole}
+                        onDeleted={() => router.refresh()}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="flex flex-col gap-3 sm:hidden">
+                {talhoes.map((t) => (
+                  <TalhaoCard
+                    key={t.id}
+                    talhao={t}
+                    farmId={farm.id}
+                    areaStat={talhaoAreaStats[t.id]}
+                    userRole={userRole}
+                    onDeleted={() => router.refresh()}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Insumos ──────────────────────────────────────────────────────── */}
       {tab === 'insumos' && (
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -125,214 +205,53 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
               action={userRole === 'admin' ? { label: 'Cadastrar insumo', href: `/farms/${farm.id}/insumos/new` } : undefined}
             />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-800">
-              <table className="w-full text-sm" style={{ minWidth: '540px' }}>
-                <thead>
-                  <tr className="border-b border-gray-800 bg-gray-900/60">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumo</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Unidade</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Estoque</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {insumos.map((ins) => (
-                    <tr key={ins.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <Link href={`/farms/${farm.id}/insumos/${ins.id}`} className="font-medium text-gray-200 hover:text-green-400 transition-colors">
-                          {ins.title}
-                        </Link>
-                        {ins.description && (
-                          <p className="text-xs text-gray-600 mt-0.5 truncate max-w-[200px]">{ins.description}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 uppercase text-xs">{ins.unit}</td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-300">
-                        {formatQuantity(ins.quantity, ins.unit)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StockBadge quantity={ins.quantity} minQuantity={ins.min_quantity} unit={ins.unit} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {userRole === 'admin' && (
-                            <button
-                              onClick={() => setAddStockFor({ id: ins.id, title: ins.title, unit: ins.unit })}
-                              className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 hover:border-green-500/50 hover:bg-green-500/20 transition-colors whitespace-nowrap"
-                            >
-                              + Estoque
-                            </button>
-                          )}
-                          <Link
-                            href={`/farms/${farm.id}/insumos/${ins.id}`}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
-                          >
-                            Detalhe
-                          </Link>
-                        </div>
-                      </td>
+            <>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-800">
+                <table className="w-full text-sm" style={{ minWidth: '540px' }}>
+                  <thead>
+                    <tr className="border-b border-gray-800 bg-gray-900/60">
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumo</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Unidade</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Estoque</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {insumos.map((ins) => (
+                      <InsumoRow
+                        key={ins.id}
+                        ins={ins}
+                        farmId={farm.id}
+                        userRole={userRole}
+                        onAddStock={() => setAddStockFor({ id: ins.id, title: ins.title, unit: ins.unit })}
+                        onDeleted={() => router.refresh()}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="flex flex-col gap-3 sm:hidden">
+                {insumos.map((ins) => (
+                  <InsumoCard
+                    key={ins.id}
+                    ins={ins}
+                    farmId={farm.id}
+                    userRole={userRole}
+                    onAddStock={() => setAddStockFor({ id: ins.id, title: ins.title, unit: ins.unit })}
+                    onDeleted={() => router.refresh()}
+                  />
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {/* Talhões */}
-      {tab === 'talhoes' && (
-        <div>
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-gray-500">{talhoes.length} talhão(ões) cadastrado(s)</p>
-            {userRole === 'admin' && (
-              <Link href={`/farms/${farm.id}/talhoes`}>
-                <Button size="sm">
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-                  </svg>
-                  Gerenciar Talhões
-                </Button>
-              </Link>
-            )}
-          </div>
-
-          {talhoes.length === 0 ? (
-            <EmptyState
-              icon="map"
-              message="Nenhum talhão cadastrado"
-              action={userRole === 'admin' ? { label: 'Gerenciar talhões', href: `/farms/${farm.id}/talhoes` } : undefined}
-            />
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-800">
-              <table className="w-full text-sm" style={{ minWidth: '740px' }}>
-                <thead>
-                  <tr className="border-b border-gray-800 bg-gray-900/60">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Talhão</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Área (ha)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      <span className="text-green-500/70">Aplic. acum.</span>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" style={{ minWidth: '130px' }}>
-                      <span className="text-green-500/70">% Aplicada</span>
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      <span className="text-green-500/70">Média kg/ha</span>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Insumos</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {talhoes.map((t) => {
-                    const usage      = talhaoUsage[t.id] ?? []
-                    const areaStat   = talhaoAreaStats[t.id]
-                    const areaHa     = Number(t.area_ha)
-                    const accumArea  = areaStat?.accumArea ?? 0
-                    const pct        = areaHa > 0 && accumArea > 0
-                      ? Math.min(100, (accumArea / areaHa) * 100)
-                      : null
-                    const avgKgHa    = areaStat && areaStat.accumArea > 0
-                      ? areaStat.totalQty / areaStat.accumArea
-                      : null
-                    const pctColor   = pct == null
-                      ? ''
-                      : pct >= 100
-                        ? 'bg-blue-500'
-                        : pct >= 75
-                          ? 'bg-green-500'
-                          : pct >= 40
-                            ? 'bg-yellow-500'
-                            : 'bg-orange-500'
-                    return (
-                      <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                        <td className="px-4 py-3">
-                          <Link
-                            href={`/farms/${farm.id}/talhoes/${t.id}`}
-                            className="font-medium text-gray-200 hover:text-green-400 transition-colors"
-                          >
-                            {t.name}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-gray-400 whitespace-nowrap">
-                          {areaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
-                          {accumArea > 0 ? (
-                            <span className="text-green-400/80">
-                              {accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
-                            </span>
-                          ) : (
-                            <span className="text-gray-700">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {pct != null ? (
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="h-1.5 flex-1 rounded-full bg-gray-800 overflow-hidden">
-                                  <div
-                                    className={cn('h-full rounded-full transition-all', pctColor)}
-                                    style={{ width: `${Math.min(100, pct)}%` }}
-                                  />
-                                </div>
-                                <span className={cn(
-                                  'text-xs font-medium tabular-nums shrink-0',
-                                  pct >= 100 ? 'text-blue-400' : pct >= 75 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-orange-400'
-                                )}>
-                                  {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-700">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
-                          {avgKgHa != null ? (
-                            <span className="text-gray-300">
-                              {avgKgHa.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                            </span>
-                          ) : (
-                            <span className="text-gray-700">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {usage.length === 0 ? (
-                            <span className="text-xs text-gray-700">—</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-                              {usage.map((s) => (
-                                <span key={s.title} className="text-xs text-gray-400">
-                                  {s.title}:{' '}
-                                  <span className="font-medium text-gray-300">
-                                    {formatQuantity(s.total, s.unit)}
-                                  </span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <Link
-                            href={`/farms/${farm.id}/talhoes/${t.id}`}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
-                          >
-                            Ver histórico
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Histórico */}
+      {/* ── Histórico ────────────────────────────────────────────────────── */}
       {tab === 'historico' && (
         <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
           <TransactionTable
@@ -347,7 +266,6 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
         </div>
       )}
 
-      {/* Modal adicionar estoque */}
       {addStockFor && (
         <AddStockModal
           farmId={farm.id}
@@ -355,29 +273,317 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
           insumoTitle={addStockFor.title}
           unit={addStockFor.unit}
           onClose={() => setAddStockFor(null)}
-          onSuccess={() => {
-            setAddStockFor(null)
-            router.refresh()
-          }}
+          onSuccess={() => { setAddStockFor(null); router.refresh() }}
         />
       )}
 
-      {/* Modal editar transação */}
       {editTx && (
         <EditTransactionModal
           farmId={farm.id}
           transaction={editTx}
           talhoes={talhoes}
           onClose={() => setEditTx(null)}
-          onSuccess={() => {
-            setEditTx(null)
-            router.refresh()
-          }}
+          onSuccess={() => { setEditTx(null); router.refresh() }}
         />
       )}
     </>
   )
 }
+
+// ─── TalhaoRow (desktop) ─────────────────────────────────────────────────────
+
+function TalhaoRow({
+  talhao: t,
+  farmId,
+  usage,
+  areaStat,
+  userRole,
+  onDeleted,
+}: {
+  talhao: Talhao
+  farmId: string
+  usage: { title: string; unit: 'kg' | 'bag'; total: number }[]
+  areaStat?: { accumArea: number; totalQty: number }
+  userRole: 'admin' | 'operario'
+  onDeleted: () => void
+}) {
+  const areaHa    = Number(t.area_ha)
+  const accumArea = areaStat?.accumArea ?? 0
+  const pct       = areaHa > 0 && accumArea > 0 ? Math.min(100, (accumArea / areaHa) * 100) : null
+  const avgKgHa   = areaStat && areaStat.accumArea > 0 ? areaStat.totalQty / areaStat.accumArea : null
+
+  const pctBar  = pct == null ? '' : pct >= 100 ? 'bg-blue-500' : pct >= 75 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : 'bg-orange-500'
+  const pctText = pct == null ? '' : pct >= 100 ? 'text-blue-400' : pct >= 75 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-orange-400'
+
+  return (
+    <tr className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+      <td className="px-4 py-3">
+        <Link href={`/farms/${farmId}/talhoes/${t.id}`} className="font-medium text-gray-200 hover:text-green-400 transition-colors">
+          {t.name}
+        </Link>
+      </td>
+      <td className="px-4 py-3 text-right font-mono text-gray-400 whitespace-nowrap">
+        {areaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+      </td>
+      <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+        {accumArea > 0
+          ? <span className="text-green-400/80">{accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha</span>
+          : <span className="text-gray-700">—</span>}
+      </td>
+      <td className="px-4 py-3" style={{ minWidth: '130px' }}>
+        {pct != null ? (
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 flex-1 rounded-full bg-gray-800 overflow-hidden">
+              <div className={cn('h-full rounded-full', pctBar)} style={{ width: `${pct}%` }} />
+            </div>
+            <span className={cn('text-xs font-medium tabular-nums shrink-0', pctText)}>
+              {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+            </span>
+          </div>
+        ) : <span className="text-xs text-gray-700">—</span>}
+      </td>
+      <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+        {avgKgHa != null
+          ? <span className="text-gray-300">{avgKgHa.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+          : <span className="text-gray-700">—</span>}
+      </td>
+      <td className="px-4 py-3">
+        {usage.length === 0 ? (
+          <span className="text-xs text-gray-700">—</span>
+        ) : (
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+            {usage.map((s) => (
+              <span key={s.title} className="text-xs text-gray-400">
+                {s.title}: <span className="font-medium text-gray-300">{formatQuantity(s.total, s.unit)}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </td>
+      <td className="px-4 py-3 text-right whitespace-nowrap">
+        <div className="flex items-center justify-end gap-2">
+          <Link
+            href={`/farms/${farmId}/talhoes/${t.id}`}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
+          >
+            Detalhes
+          </Link>
+          {userRole === 'admin' && (
+            <ConfirmDeleteButton
+              onConfirm={async () => {
+                const res = await fetch(`/api/farms/${farmId}/talhoes/${t.id}`, { method: 'DELETE' })
+                if (!res.ok) throw new Error('Falha ao apagar talhão')
+                onDeleted()
+              }}
+            />
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// ─── TalhaoCard (mobile) ─────────────────────────────────────────────────────
+
+function TalhaoCard({
+  talhao: t,
+  farmId,
+  areaStat,
+  userRole,
+  onDeleted,
+}: {
+  talhao: Talhao
+  farmId: string
+  areaStat?: { accumArea: number; totalQty: number }
+  userRole: 'admin' | 'operario'
+  onDeleted: () => void
+}) {
+  const areaHa    = Number(t.area_ha)
+  const accumArea = areaStat?.accumArea ?? 0
+  const pct       = areaHa > 0 && accumArea > 0 ? Math.min(100, (accumArea / areaHa) * 100) : null
+  const pctBar  = pct == null ? '' : pct >= 100 ? 'bg-blue-500' : pct >= 75 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : 'bg-orange-500'
+  const pctText = pct == null ? '' : pct >= 100 ? 'text-blue-400' : pct >= 75 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-orange-400'
+
+  return (
+    <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link href={`/farms/${farmId}/talhoes/${t.id}`} className="text-base font-semibold text-gray-100 hover:text-green-400 transition-colors">
+            {t.name}
+          </Link>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {areaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha cadastrados
+          </p>
+        </div>
+        {pct != null && (
+          <span className={cn('text-sm font-bold tabular-nums shrink-0', pctText)}>
+            {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+          </span>
+        )}
+      </div>
+
+      {pct != null && (
+        <div className="mt-3 h-2 w-full rounded-full bg-gray-800 overflow-hidden">
+          <div className={cn('h-full rounded-full', pctBar)} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+
+      {accumArea > 0 && (
+        <p className="mt-2 text-xs text-green-400/70">
+          {accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha aplicados
+        </p>
+      )}
+
+      <div className="mt-3 flex items-center gap-2">
+        <Link
+          href={`/farms/${farmId}/talhoes/${t.id}`}
+          className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 py-2 text-center text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-gray-100 transition-colors"
+        >
+          Detalhes
+        </Link>
+        {userRole === 'admin' && (
+          <ConfirmDeleteButton
+            onConfirm={async () => {
+              const res = await fetch(`/api/farms/${farmId}/talhoes/${t.id}`, { method: 'DELETE' })
+              if (!res.ok) throw new Error('Falha ao apagar talhão')
+              onDeleted()
+            }}
+            className="rounded-lg border border-red-500/20 bg-red-500/8 px-4 py-2 text-sm font-medium text-red-400/80 hover:border-red-500/40 hover:bg-red-500/15 hover:text-red-400 transition-colors"
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── InsumoRow (desktop) ─────────────────────────────────────────────────────
+
+function InsumoRow({
+  ins,
+  farmId,
+  userRole,
+  onAddStock,
+  onDeleted,
+}: {
+  ins: any
+  farmId: string
+  userRole: 'admin' | 'operario'
+  onAddStock: () => void
+  onDeleted: () => void
+}) {
+  return (
+    <tr className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+      <td className="px-4 py-3">
+        <Link href={`/farms/${farmId}/insumos/${ins.id}`} className="font-medium text-gray-200 hover:text-green-400 transition-colors">
+          {ins.title}
+        </Link>
+        {ins.description && (
+          <p className="text-xs text-gray-600 mt-0.5 truncate max-w-[200px]">{ins.description}</p>
+        )}
+      </td>
+      <td className="px-4 py-3 text-gray-400 uppercase text-xs">{ins.unit}</td>
+      <td className="px-4 py-3 text-right font-mono text-gray-300">
+        {formatQuantity(ins.quantity, ins.unit)}
+      </td>
+      <td className="px-4 py-3">
+        <StockBadge quantity={ins.quantity} minQuantity={ins.min_quantity} unit={ins.unit} />
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
+          {userRole === 'admin' && (
+            <button
+              onClick={onAddStock}
+              className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 hover:border-green-500/50 hover:bg-green-500/20 transition-colors whitespace-nowrap"
+            >
+              + Estoque
+            </button>
+          )}
+          <Link
+            href={`/farms/${farmId}/insumos/${ins.id}`}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
+          >
+            Detalhe
+          </Link>
+          {userRole === 'admin' && (
+            <ConfirmDeleteButton
+              onConfirm={async () => {
+                const res = await fetch(`/api/farms/${farmId}/insumos/${ins.id}`, { method: 'DELETE' })
+                if (!res.ok) throw new Error('Falha ao apagar insumo')
+                onDeleted()
+              }}
+            />
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// ─── InsumoCard (mobile) ─────────────────────────────────────────────────────
+
+function InsumoCard({
+  ins,
+  farmId,
+  userRole,
+  onAddStock,
+  onDeleted,
+}: {
+  ins: any
+  farmId: string
+  userRole: 'admin' | 'operario'
+  onAddStock: () => void
+  onDeleted: () => void
+}) {
+  return (
+    <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link href={`/farms/${farmId}/insumos/${ins.id}`} className="text-base font-semibold text-gray-100 hover:text-green-400 transition-colors">
+            {ins.title}
+          </Link>
+          {ins.description && (
+            <p className="mt-0.5 text-xs text-gray-500 truncate">{ins.description}</p>
+          )}
+        </div>
+        <StockBadge quantity={ins.quantity} minQuantity={ins.min_quantity} unit={ins.unit} />
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 text-sm">
+        <span className="text-gray-400 font-mono font-semibold">{formatQuantity(ins.quantity, ins.unit)}</span>
+        <span className="text-gray-700 text-xs uppercase">{ins.unit}</span>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
+        {userRole === 'admin' && (
+          <button
+            onClick={onAddStock}
+            className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+          >
+            + Estoque
+          </button>
+        )}
+        <Link
+          href={`/farms/${farmId}/insumos/${ins.id}`}
+          className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 py-2 text-center text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-gray-100 transition-colors"
+        >
+          Detalhe
+        </Link>
+        {userRole === 'admin' && (
+          <ConfirmDeleteButton
+            onConfirm={async () => {
+              const res = await fetch(`/api/farms/${farmId}/insumos/${ins.id}`, { method: 'DELETE' })
+              if (!res.ok) throw new Error('Falha ao apagar insumo')
+              onDeleted()
+            }}
+            className="rounded-lg border border-red-500/20 bg-red-500/8 px-4 py-2 text-sm font-medium text-red-400/80 hover:border-red-500/40 hover:bg-red-500/15 hover:text-red-400 transition-colors"
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── EmptyState ──────────────────────────────────────────────────────────────
 
 function EmptyState({
   icon,

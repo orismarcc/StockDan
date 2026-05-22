@@ -106,26 +106,16 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <p className="text-sm text-gray-500">
               {insumos.length} insumo{insumos.length !== 1 ? 's' : ''} cadastrado{insumos.length !== 1 ? 's' : ''}
             </p>
-            <div className="flex gap-2">
-              <Link href={`/farms/${farm.id}/retirada`}>
-                <Button variant="secondary" size="sm">
+            {userRole === 'admin' && (
+              <Link href={`/farms/${farm.id}/insumos/new`}>
+                <Button size="sm">
                   <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" />
+                    <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
                   </svg>
-                  Registrar Retirada
+                  Novo Insumo
                 </Button>
               </Link>
-              {userRole === 'admin' && (
-                <Link href={`/farms/${farm.id}/insumos/new`}>
-                  <Button size="sm">
-                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-                    </svg>
-                    Novo Insumo
-                  </Button>
-                </Link>
-              )}
-            </div>
+            )}
           </div>
 
           {insumos.length === 0 ? (

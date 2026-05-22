@@ -154,6 +154,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {} }: W
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        {/* Insumo */}
         <div className="flex flex-col gap-1.5">
           <Select
             label="Insumo *"
@@ -178,21 +179,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {} }: W
           )}
         </div>
 
-        <Input
-          label={`Quantidade${selectedInsumo ? ` (${selectedInsumo.unit === 'bag' ? 'sacas' : 'kg'})` : ''} *`}
-          type="number"
-          min="0.001"
-          step="0.001"
-          max={selectedInsumo ? String(availableQty) : undefined}
-          placeholder="0"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          hint={selectedInsumo?.unit === 'bag' ? '1 saca = 1.000 kg' : undefined}
-          required
-          disabled={!insumoId}
-        />
-
-        {/* Talhão + preview */}
+        {/* Talhão de destino + preview */}
         <div className="flex flex-col gap-2">
           <Select
             label="Talhão de destino *"
@@ -248,6 +235,21 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {} }: W
             </div>
           )}
         </div>
+
+        {/* Quantidade */}
+        <Input
+          label={`Quantidade${selectedInsumo ? ` (${selectedInsumo.unit === 'bag' ? 'sacas' : 'kg'})` : ''} *`}
+          type="number"
+          min="0.001"
+          step="0.001"
+          max={selectedInsumo ? String(availableQty) : undefined}
+          placeholder="0"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          hint={selectedInsumo?.unit === 'bag' ? '1 saca = 1.000 kg' : undefined}
+          required
+          disabled={!insumoId}
+        />
 
         {/* Área aplicada (opcional) */}
         <div className="flex flex-col gap-1">

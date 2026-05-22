@@ -54,8 +54,16 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
             <span>{farm.city}, {farm.state}</span>
           </p>
         </div>
-        {session.role === 'admin' && (
           <div className="flex gap-2">
+          <Link href={`/farms/${id}/retirada`}>
+            <button className="flex items-center gap-2 rounded-lg border border-green-600/40 bg-green-600/10 px-3 py-2 text-sm font-medium text-green-400 hover:bg-green-600/20 hover:border-green-500/60 transition-colors">
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" />
+              </svg>
+              Registrar Retirada
+            </button>
+          </Link>
+          {session.role === 'admin' && (
             <Link href={`/farms/${id}/edit`}>
               <button className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors">
                 <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -65,8 +73,8 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
                 Editar
               </button>
             </Link>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <FarmTabs

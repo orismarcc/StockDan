@@ -14,7 +14,8 @@ export async function checkFarmAccess(
       .eq('id', farmId)
       .single()
     if (!data) return false
-    return data.owner_id === session.id
+    // Pode acessar sua própria fazenda ou fazenda sem dono (para reivindicação)
+    return data.owner_id === null || data.owner_id === session.id
   }
 
   const { data } = await supabase

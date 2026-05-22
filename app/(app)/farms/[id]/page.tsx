@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { FarmTabs } from '@/components/FarmTabs'
+import { ClaimFarmBanner } from '@/components/ClaimFarmBanner'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -76,6 +77,11 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
           )}
         </div>
       </div>
+
+      {/* Banner de reivindicação para fazendas sem dono (somente admins) */}
+      {session.role === 'admin' && farm.owner_id === null && (
+        <ClaimFarmBanner farmId={id} />
+      )}
 
       <FarmTabs
         farm={farm}

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import Script from 'next/script'
 import { SwRegistration } from '@/components/SwRegistration'
 import './globals.css'
 
@@ -21,13 +22,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <head>
-        {/* Captura beforeinstallprompt antes do React hidratar */}
-        <script dangerouslySetInnerHTML={{
-          __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__deferredPrompt=e;});`
-        }} />
-      </head>
       <body className="h-full bg-gray-950 text-gray-100">
+        {/*
+          beforeInteractive garante execução ANTES do React hidratar —
+          captura o evento beforeinstallprompt que Chrome dispara logo no load.
+        */}
+        <Script id="pwa-capture" strategy="beforeInteractive">{`
+          window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            window.__deferredPrompt = e;
+            console.log('[PWA] beforeinstallprompt capturado');
+          });
+          console.log('[PWA] listener registrado');
+        `}</Script>
         <SwRegistration />
         {children}
       </body>

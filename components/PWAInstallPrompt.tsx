@@ -17,66 +17,65 @@ declare global {
 const DISMISS_KEY = 'stockdan-pwa-dismissed'
 const DISMISS_DAYS = 7
 
+type SwStatus = 'checking' | 'active' | 'installing' | 'unsupported' | 'failed'
+
 export function PWAInstallPrompt() {
   const [isOpen, setIsOpen] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isIOS, setIsIOS] = useState(false)
-  // Começa false, só renderiza depois de verificar se está em standalone
   const [ready, setReady] = useState(false)
+  const [swStatus, setSwStatus] = useState<SwStatus>('checking')
 
   useEffect(() => {
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as any).standalone === true
 
-    // Já instalado: não mostrar nada
     if (standalone) return
 
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
     setIsIOS(ios)
-
-    // Sempre pronto quando não está em standalone
     setReady(true)
 
-    // Expõe função para o Sidebar reabrir o sheet
     window.__pwaInstallOpen = () => setIsOpen(true)
 
-    // Pega prompt já capturado pelo script inline no <head>
+    // Detecta status do SW
+    if (!('serviceWorker' in navigator)) {
+      setSwStatus('unsupported')
+    } else {
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        if (!reg) {
+          setSwStatus('failed')
+        } else if (reg.active) {
+          setSwStatus('active')
+        } else {
+          setSwStatus('installing')
+          const worker = reg.installing ?? reg.waiting
+          worker?.addEventListener('statechange', function () {
+            if (this.state === 'activated') setSwStatus('active')
+          })
+        }
+      })
+    }
+
+    // Captura prompt já salvo pelo script beforeInteractive
     if (window.__deferredPrompt) {
+      console.log('[PWA] prompt já disponível no mount')
       setDeferredPrompt(window.__deferredPrompt)
     }
 
-    // Continua escutando caso ainda não tenha disparado
+    // Escuta novos eventos
     const handlePrompt = (e: Event) => {
       e.preventDefault()
       const prompt = e as BeforeInstallPromptEvent
       window.__deferredPrompt = prompt
       setDeferredPrompt(prompt)
+      console.log('[PWA] beforeinstallprompt recebido no componente')
     }
     window.addEventListener('beforeinstallprompt', handlePrompt)
 
-    // Auto-abre após delay se não foi dispensado recentemente
-    const dismissed = localStorage.getItem(DISMISS_KEY)
-    const recentlyDismissed = dismissed
-      ? (Date.now() - new Date(dismissed).getTime()) / 86_400_000 < DISMISS_DAYS
-      : false
-
-    if (!recentlyDismissed) {
-      if (ios) {
-        // iOS: sempre auto-abre (instruções manuais)
-        setTimeout(() => setIsOpen(true), 2500)
-      } else if (window.__deferredPrompt) {
-        // Prompt já disponível: auto-abre
-        setTimeout(() => setIsOpen(true), 2500)
-      } else {
-        // Aguarda o prompt chegar e abre quando chegar
-        window.addEventListener(
-          'beforeinstallprompt',
-          () => setTimeout(() => setIsOpen(true), 2500),
-          { once: true }
-        )
-      }
-    }
+    // Não abre automaticamente — só via clique manual em "Instalar App"
+    // (evita aparecer em momento ruim)
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handlePrompt)
@@ -100,7 +99,6 @@ export function PWAInstallPrompt() {
     setIsOpen(false)
   }
 
-  // Não renderiza no server nem se já estiver instalado
   if (!ready) return null
 
   return (
@@ -118,7 +116,7 @@ export function PWAInstallPrompt() {
 
         <div className="mb-5 text-center">
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-gray-800 bg-gray-950 overflow-hidden">
-            <img src="/icon192" alt="StockDan" className="h-full w-full object-cover" />
+            <img src="/icon-192.png" alt="StockDan" className="h-full w-full object-cover" />
           </div>
           <h3 className="text-lg font-bold text-gray-100">Instale o StockDan</h3>
           <p className="mt-1 text-sm text-gray-400">
@@ -133,6 +131,7 @@ export function PWAInstallPrompt() {
         </div>
 
         {isIOS ? (
+          /* iPhone / iPad */
           <div className="space-y-3">
             <p className="text-center text-sm text-gray-400 leading-relaxed">
               No <strong className="text-gray-200">Safari</strong>, toque em{' '}
@@ -146,6 +145,7 @@ export function PWAInstallPrompt() {
             </button>
           </div>
         ) : deferredPrompt ? (
+          /* Android/Chrome com prompt disponível — instalação nativa */
           <div className="space-y-2.5">
             <button
               onClick={handleInstall}
@@ -161,13 +161,46 @@ export function PWAInstallPrompt() {
             </button>
           </div>
         ) : (
-          // Navegador não suporta install prompt automático — instrução genérica
+          /* Sem prompt disponível — diagnóstico + instrução manual */
           <div className="space-y-3">
-            <p className="text-center text-sm text-gray-400 leading-relaxed">
-              Abra este site no <strong className="text-gray-200">Chrome</strong> e use o menu do navegador para adicionar à tela inicial.
-            </p>
-            <button onClick={handleDismiss} className="w-full rounded-xl bg-green-500 py-3.5 text-sm font-semibold text-white">
-              Entendi
+            {/* Status do Service Worker */}
+            <div className="rounded-xl border border-gray-800 bg-gray-800/40 p-3 text-xs space-y-1.5">
+              <p className="font-semibold text-gray-400 mb-2">Diagnóstico</p>
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${swStatus === 'active' ? 'bg-green-500' : swStatus === 'installing' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                <span className="text-gray-400">
+                  Service Worker: {swStatus === 'active' ? 'ativo ✓' : swStatus === 'installing' ? 'instalando...' : swStatus === 'unsupported' ? 'não suportado' : 'não registrado'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-red-500" />
+                <span className="text-gray-400">Prompt de instalação: não disponível</span>
+              </div>
+            </div>
+
+            {swStatus === 'active' ? (
+              /* SW ativo mas sem prompt — Chrome em cooldown */
+              <div className="space-y-2">
+                <p className="text-sm text-gray-400 leading-relaxed text-center">
+                  O Chrome bloqueou o prompt temporariamente. Para instalar agora:
+                </p>
+                <ol className="text-sm text-gray-400 space-y-1.5">
+                  <li className="flex gap-2"><span className="text-green-400 font-bold shrink-0">1.</span> Toque nos <strong className="text-gray-200">⋮ três pontos</strong> do Chrome</li>
+                  <li className="flex gap-2"><span className="text-green-400 font-bold shrink-0">2.</span> Procure <strong className="text-gray-200">"Instalar app"</strong> (não "Adicionar à tela inicial")</li>
+                  <li className="flex gap-2"><span className="text-green-400 font-bold shrink-0">3.</span> Se não aparecer, acesse as <strong className="text-gray-200">Configurações do Chrome → Privacidade → Configurações do site → stockdan-app.vercel.app → Limpar e redefinir</strong> e tente novamente</li>
+                </ol>
+              </div>
+            ) : (
+              /* SW não ativo — problema mais sério */
+              <div className="space-y-2">
+                <p className="text-sm text-amber-400 leading-relaxed text-center">
+                  O Service Worker ainda não está ativo. Tente recarregar a página e abrir este menu novamente.
+                </p>
+              </div>
+            )}
+
+            <button onClick={handleDismiss} className="w-full rounded-xl bg-gray-800 py-3 text-sm text-gray-400 hover:bg-gray-700 transition-colors">
+              Fechar
             </button>
           </div>
         )}

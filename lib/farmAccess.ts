@@ -14,7 +14,7 @@ export async function checkFarmAccess(
       .eq('id', farmId)
       .single()
     if (!data) return false
-    return data.owner_id === null || data.owner_id === session.id
+    return data.owner_id === session.id
   }
 
   const { data } = await supabase

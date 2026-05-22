@@ -13,11 +13,11 @@ async function getFarmsWithStats(userId: string, role: string) {
   let farmsData: any[] = []
 
   if (role === 'admin') {
-    // Admins veem suas próprias fazendas + fazendas legadas (owner_id NULL)
+    // Admins veem apenas suas próprias fazendas
     const { data } = await supabase
       .from('farms')
       .select('*')
-      .or(`owner_id.eq.${userId},owner_id.is.null`)
+      .eq('owner_id', userId)
       .order('name')
     farmsData = data ?? []
   } else {

@@ -1,13 +1,8 @@
-export function formatQuantity(value: number, unit: 'kg' | 'bag'): string {
+export function formatQuantity(value: number, _unit?: string): string {
   const formatted = Number(value).toLocaleString('pt-BR', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 3,
   })
-  if (unit === 'bag') {
-    const kg = value * 1000
-    const kgFormatted = kg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })
-    return `${formatted} ${value === 1 ? 'bag' : 'bags'} (${kgFormatted} kg)`
-  }
   return `${formatted} kg`
 }
 

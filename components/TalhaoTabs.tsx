@@ -13,7 +13,7 @@ interface EnrichedTx {
   created_at: string | null
   notes: string | null
   _insumoTitle: string
-  _insumoUnit: 'kg' | 'bag'
+  _insumoUnit: string
   _qty: number
   _area: number | null
   _accumArea: number
@@ -22,9 +22,8 @@ interface EnrichedTx {
 
 interface InsumoSummary {
   title: string
-  unit: 'kg' | 'bag'
+  unit: string
   totalQty: number
-  totalQtyKg: number
   count: number
   totalArea: number
   hasArea: boolean
@@ -90,7 +89,7 @@ export function TalhaoTabs({
 
   // Agrupar retiradas por insumo (mantendo ordem mais recente primeiro)
   const txByInsumo = useMemo(() => {
-    const groups: { title: string; unit: 'kg' | 'bag'; txs: EnrichedTx[] }[] = []
+    const groups: { title: string; unit: string; txs: EnrichedTx[] }[] = []
     const seen = new Map<string, number>()
     for (const tx of txDisplay) {
       if (!seen.has(tx._insumoTitle)) {
@@ -117,8 +116,8 @@ export function TalhaoTabs({
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {summary.map((s) => {
-              const avgKgHa = s.hasArea && s.totalArea > 0 ? s.totalQtyKg / s.totalArea : null
-              const haPrevistoTotal = activeTaxa && activeTaxa > 0 ? s.totalQtyKg / activeTaxa : null
+              const avgKgHa = s.hasArea && s.totalArea > 0 ? s.totalQty / s.totalArea : null
+              const haPrevistoTotal = activeTaxa && activeTaxa > 0 ? s.totalQty / activeTaxa : null
               return (
                 <div key={s.title} className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 space-y-2">
                   <p className="text-xs text-gray-500 truncate">{s.title}</p>
@@ -226,9 +225,9 @@ export function TalhaoTabs({
                         {groupSummary?.hasArea && groupSummary.totalArea > 0 && (
                           <span className="rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs text-green-400/80">
                             {fmtHa(groupSummary.totalArea)} aplicados
-                            {groupSummary.totalQtyKg > 0 && groupSummary.totalArea > 0 && (
+                            {groupSummary.totalQty > 0 && groupSummary.totalArea > 0 && (
                               <span className="text-gray-500 ml-1">
-                                · {fmtKgHa(groupSummary.totalQtyKg / groupSummary.totalArea)}
+                                · {fmtKgHa(groupSummary.totalQty / groupSummary.totalArea)}
                               </span>
                             )}
                           </span>
@@ -263,8 +262,7 @@ export function TalhaoTabs({
                         </thead>
                         <tbody>
                           {group.txs.map((tx) => {
-                            const qtyKgTx = tx._insumoUnit === 'bag' ? tx._qty * 1000 : tx._qty
-                            const haPrevistoRaw = activeTaxa && activeTaxa > 0 ? qtyKgTx / activeTaxa : null
+                            const haPrevistoRaw = activeTaxa && activeTaxa > 0 ? tx._qty / activeTaxa : null
                             return (
                               <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
                                 <td className="px-4 py-3 whitespace-nowrap">

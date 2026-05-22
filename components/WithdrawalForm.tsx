@@ -14,7 +14,7 @@ import { insumoCache } from '@/lib/insumoCache'
 interface Insumo {
   id: string
   title: string
-  unit: 'kg' | 'bag'
+  unit: string
   quantity: number
 }
 
@@ -239,7 +239,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
 
         {/* Quantidade */}
         <Input
-          label={`Quantidade${selectedInsumo ? ` (${selectedInsumo.unit === 'bag' ? 'bags' : 'kg'})` : ''} *`}
+          label="Quantidade (kg) *"
           type="number"
           min="0.001"
           step="0.001"
@@ -247,7 +247,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
           placeholder="0"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          hint={selectedInsumo?.unit === 'bag' ? '1 bag = 1.000 kg' : undefined}
+          hint={undefined}
           required
           disabled={!insumoId}
         />
@@ -275,7 +275,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
             <p className="text-xs text-gray-500">
               Taxa desta aplicação:{' '}
               <span className="font-medium text-green-400">
-                {((Number(quantity) * (selectedInsumo?.unit === 'bag' ? 1000 : 1)) / parseFloat(areaHa.replace(',', '.'))).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
+                {(Number(quantity) / parseFloat(areaHa.replace(',', '.'))).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
               </span>
             </p>
           )}

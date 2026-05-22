@@ -10,7 +10,7 @@ export interface Transaction {
   date: string
   created_at: string
   notes: string | null
-  insumos: { title: string; unit: 'kg' | 'bag' } | null
+  insumos: { title: string; unit: string } | null
   talhoes: { id: string; name: string } | null
   users: { name: string } | null
 }

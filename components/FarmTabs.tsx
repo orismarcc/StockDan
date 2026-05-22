@@ -30,9 +30,9 @@ interface FarmTabsProps {
 
 export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: FarmTabsProps) {
   const [tab, setTab] = useState<TabId>('talhoes')
-  const [addStockFor, setAddStockFor] = useState<{ id: string; title: string; unit: 'kg' | 'bag' } | null>(null)
+  const [addStockFor, setAddStockFor] = useState<{ id: string; title: string; unit: string } | null>(null)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
-  const [editQtyFor, setEditQtyFor] = useState<{ id: string; title: string; unit: 'kg' | 'bag'; currentQty: number } | null>(null)
+  const [editQtyFor, setEditQtyFor] = useState<{ id: string; title: string; unit: string; currentQty: number } | null>(null)
   const router = useRouter()
 
   // Área acumulada por insumo por talhão
@@ -42,9 +42,8 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
       if (tx.type !== 'saida' || !tx.talhoes?.id || !tx.insumos) continue
       const tid = tx.talhoes.id
       const insumoTitle = tx.insumos.title
-      const unit = tx.insumos.unit as 'kg' | 'bag'
       const qty = Number(tx.quantity)
-      const qtyKg = unit === 'bag' ? qty * 1000 : qty
+      const qtyKg = qty
       const areaHa = (tx as any).area_ha != null && Number((tx as any).area_ha) > 0
         ? Number((tx as any).area_ha) : 0
       if (!result[tid]) result[tid] = {}
@@ -646,7 +645,7 @@ function AdjustQuantityModal({
   farmId: string
   insumoId: string
   insumoTitle: string
-  unit: 'kg' | 'bag'
+  unit: string
   currentQty: number
   onClose: () => void
   onSuccess: () => void
@@ -655,7 +654,7 @@ function AdjustQuantityModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const unitLabel = unit === 'bag' ? 'bags' : 'kg'
+  const unitLabel = 'kg'
 
   async function handleSave() {
     const qty = Number(newQty)

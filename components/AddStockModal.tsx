@@ -11,7 +11,7 @@ interface AddStockModalProps {
   farmId: string
   insumoId: string
   insumoTitle: string
-  unit: 'kg' | 'bag'
+  unit?: string
   onClose: () => void
   onSuccess: () => void
 }
@@ -50,14 +50,14 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
     <Modal open title={`Adicionar Estoque — ${insumoTitle}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input
-          label={`Quantidade (${unit === 'bag' ? 'sacas' : 'kg'}) *`}
+          label="Quantidade (kg) *"
           type="number"
           min="0.001"
           step="0.001"
           placeholder="0"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          hint={unit === 'bag' ? '1 saca = 1.000 kg' : undefined}
+          hint={undefined}
           required
         />
         <Input

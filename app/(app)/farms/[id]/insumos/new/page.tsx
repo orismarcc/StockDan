@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { todayISO } from '@/lib/utils'
@@ -77,26 +76,9 @@ export default function NewInsumoPage({ params }: { params: Promise<{ id: string
             onChange={(e) => set('description', e.target.value)}
           />
 
-          <div className="rounded-lg border border-amber-500/10 bg-amber-500/5 px-4 py-3">
-            <p className="text-xs text-amber-400/80">
-              A unidade de medida não pode ser alterada após a criação.
-            </p>
-          </div>
-
-          <Select
-            label="Unidade de Medida *"
-            value={form.unit}
-            onChange={(e) => set('unit', e.target.value)}
-            hint="1 saca (bag) = 1.000 kg"
-            required
-          >
-            <option value="kg">kg — Quilogramas</option>
-            <option value="bag">bag — Sacas (1 bag = 1.000 kg)</option>
-          </Select>
-
-          <div className="grid grid-cols-2 gap-4">
+<div className="grid grid-cols-2 gap-4">
             <Input
-              label={`Estoque Inicial (${form.unit === 'bag' ? 'sacas' : 'kg'})`}
+              label="Estoque Inicial (kg)"
               type="number"
               min="0"
               step="0.001"
@@ -105,7 +87,7 @@ export default function NewInsumoPage({ params }: { params: Promise<{ id: string
               onChange={(e) => set('quantity', e.target.value)}
             />
             <Input
-              label={`Qtd Mínima (${form.unit === 'bag' ? 'sacas' : 'kg'})`}
+              label="Qtd Mínima (kg)"
               type="number"
               min="0"
               step="0.001"

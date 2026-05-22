@@ -3,7 +3,7 @@ const CACHE_KEY = 'stockdan_insumo_cache'
 export interface CachedInsumo {
   id: string
   title: string
-  unit: 'kg' | 'bag'
+  unit: string
   quantity: number
 }
 

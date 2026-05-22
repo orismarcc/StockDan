@@ -154,7 +154,7 @@ export default async function DashboardPage() {
             {
               step: '2',
               title: 'Adicione insumos',
-              desc: 'Cadastre os produtos (fertilizantes, defensivos etc.) e informe o estoque inicial em kg ou bags.',
+              desc: 'Cadastre os produtos (fertilizantes, defensivos etc.) e informe o estoque inicial em kg.',
             },
             {
               step: '3',

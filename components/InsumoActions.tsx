@@ -7,7 +7,7 @@ import { Button } from './ui/Button'
 
 interface InsumoActionsProps {
   farmId: string
-  insumo: { id: string; title: string; unit: 'kg' | 'bag' }
+  insumo: { id: string; title: string; unit: string }
 }
 
 export function InsumoActions({ farmId, insumo }: InsumoActionsProps) {

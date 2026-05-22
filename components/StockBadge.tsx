@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 interface StockBadgeProps {
   quantity: number
   minQuantity?: number | null
-  unit: 'kg' | 'bag'
+  unit?: string
   className?: string
 }
 

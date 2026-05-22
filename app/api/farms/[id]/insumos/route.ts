@@ -39,8 +39,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!title || !unit || quantity === undefined || !date) {
     return NextResponse.json({ error: 'Preencha os campos obrigatórios.' }, { status: 400 })
   }
-  if (!['kg', 'bag'].includes(unit)) {
-    return NextResponse.json({ error: 'Unidade inválida.' }, { status: 400 })
+  if (unit !== 'kg') {
+    return NextResponse.json({ error: 'Unidade inválida. Use kg.' }, { status: 400 })
   }
 
   const supabase = createServerClient()

@@ -36,8 +36,7 @@ export function EditTransactionModal({
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const unit = transaction.insumos?.unit ?? 'kg'
-  const unitLabel = unit === 'bag' ? 'sacas' : 'kg'
+  const unitLabel = 'kg'
   const typeLabel = transaction.type === 'entrada' ? 'Entrada' : 'Retirada'
 
   async function handleSubmit(e: React.FormEvent) {
@@ -81,7 +80,7 @@ export function EditTransactionModal({
           step="0.001"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          hint={unit === 'bag' ? '1 saca = 1.000 kg' : undefined}
+          hint={undefined}
           required
         />
         <Input

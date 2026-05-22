@@ -9,9 +9,12 @@ export async function GET() {
   const supabase = createServerClient()
 
   if (session.role === 'admin') {
+    // Admins veem apenas suas próprias fazendas (owner_id = session.id)
+    // Fazendas legadas com owner_id NULL ainda aparecem para todos os admins (compatibilidade)
     const { data, error } = await supabase
       .from('farms')
       .select('*')
+      .or(`owner_id.eq.${session.id},owner_id.is.null`)
       .order('name')
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -44,7 +47,7 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('farms')
-    .insert({ name, city, state: state.toUpperCase(), farmer_name })
+    .insert({ name, city, state: state.toUpperCase(), farmer_name, owner_id: session.id })
     .select()
     .single()
 

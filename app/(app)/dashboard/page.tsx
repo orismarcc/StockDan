@@ -31,15 +31,9 @@ async function getFarmsWithStats(userId: string, role: string) {
   // Para cada fazenda, busca contagem de insumos, talhões, área e status
   const farmsWithStats = await Promise.all(
     farmsData.map(async (farm) => {
-      const [{ data: insumos }, { data: talhaoRows }, { data: txAreas }] = await Promise.all([
+      const [{ data: insumos }, { data: talhaoRows }] = await Promise.all([
         supabase.from('insumos').select('quantity, min_quantity').eq('farm_id', farm.id),
         supabase.from('talhoes').select('area_ha').eq('farm_id', farm.id),
-        supabase
-          .from('transactions')
-          .select('area_ha')
-          .eq('farm_id', farm.id)
-          .eq('type', 'saida')
-          .not('area_ha', 'is', null),
       ])
 
       const list        = insumos ?? []
@@ -50,11 +44,7 @@ async function getFarmsWithStats(userId: string, role: string) {
         Number(i.quantity) <= Number(i.min_quantity)
       ).length
 
-      const totalAreaHa  = (talhaoRows ?? []).reduce((s, t) => s + Number(t.area_ha), 0)
-      const accumAreaHa  = (txAreas ?? []).reduce((s, t) => s + Number(t.area_ha), 0)
-      const pctApplied   = totalAreaHa > 0 && accumAreaHa > 0
-        ? Math.min(100, (accumAreaHa / totalAreaHa) * 100)
-        : null
+      const totalAreaHa = (talhaoRows ?? []).reduce((s, t) => s + Number(t.area_ha), 0)
 
       return {
         ...farm,
@@ -63,8 +53,6 @@ async function getFarmsWithStats(userId: string, role: string) {
         emptyCount,
         lowCount,
         totalAreaHa,
-        accumAreaHa,
-        pctApplied,
       }
     })
   )
@@ -130,8 +118,6 @@ export default async function DashboardPage() {
               emptyCount={farm.emptyCount}
               lowCount={farm.lowCount}
               totalAreaHa={farm.totalAreaHa}
-              accumAreaHa={farm.accumAreaHa}
-              pctApplied={farm.pctApplied}
             />
           ))}
         </div>

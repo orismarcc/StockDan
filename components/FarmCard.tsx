@@ -11,8 +11,6 @@ interface FarmCardProps {
   emptyCount: number
   lowCount: number
   totalAreaHa?: number
-  accumAreaHa?: number
-  pctApplied?: number | null
 }
 
 export function FarmCard({
@@ -26,23 +24,9 @@ export function FarmCard({
   emptyCount,
   lowCount,
   totalAreaHa = 0,
-  accumAreaHa = 0,
-  pctApplied = null,
 }: FarmCardProps) {
   const allOk    = insumoCount > 0 && emptyCount === 0 && lowCount === 0
   const hasAlerts = emptyCount > 0 || lowCount > 0
-
-  const pctColor = pctApplied == null ? ''
-    : pctApplied >= 100 ? 'bg-blue-500'
-    : pctApplied >= 75  ? 'bg-green-500'
-    : pctApplied >= 40  ? 'bg-yellow-500'
-    : 'bg-orange-500'
-
-  const pctTextColor = pctApplied == null ? ''
-    : pctApplied >= 100 ? 'text-blue-400'
-    : pctApplied >= 75  ? 'text-green-400'
-    : pctApplied >= 40  ? 'text-yellow-400'
-    : 'text-orange-400'
 
   return (
     <Link
@@ -86,37 +70,18 @@ export function FarmCard({
           </div>
         </div>
 
-        {/* Área total + % aplicada */}
+        {/* Área total cadastrada */}
         {totalAreaHa > 0 && (
-          <div className="mt-3 rounded-lg border border-gray-800 bg-gray-800/30 px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="text-xs text-gray-500">
-                Área total:{' '}
-                <span className="font-medium text-gray-300">
-                  {totalAreaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
-                </span>
+          <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-gray-800 bg-gray-800/30 px-3 py-2">
+            <svg className="h-3.5 w-3.5 shrink-0 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+            </svg>
+            <span className="text-xs text-gray-500">
+              Área total:{' '}
+              <span className="font-medium text-gray-300">
+                {totalAreaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
               </span>
-              {pctApplied != null ? (
-                <span className={`text-xs font-semibold tabular-nums ${pctTextColor}`}>
-                  {pctApplied.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% aplic.
-                </span>
-              ) : (
-                <span className="text-xs text-gray-700 italic">0% aplic.</span>
-              )}
-            </div>
-            <div className="h-1.5 w-full rounded-full bg-gray-700 overflow-hidden">
-              {pctApplied != null && (
-                <div
-                  className={`h-full rounded-full ${pctColor}`}
-                  style={{ width: `${Math.min(100, pctApplied)}%` }}
-                />
-              )}
-            </div>
-            {accumAreaHa > 0 && (
-              <p className="mt-1 text-[11px] text-gray-600">
-                {accumAreaHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha aplicados
-              </p>
-            )}
+            </span>
           </div>
         )}
 

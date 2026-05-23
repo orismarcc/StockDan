@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { checkFarmAccess } from '@/lib/farmAccess'
 import { FarmTabs } from '@/components/FarmTabs'
 import { DeleteFarmButton } from '@/components/DeleteFarmButton'
 
@@ -18,6 +19,8 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
 
   const { id } = await params
   const supabase = createServerClient()
+
+  if (!(await checkFarmAccess(supabase, session, id))) redirect('/dashboard')
 
   const { data: farm } = await supabase.from('farms').select('*').eq('id', id).single()
   if (!farm) notFound()

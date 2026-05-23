@@ -34,7 +34,8 @@ interface WithdrawalFormProps {
   farmId: string
   insumos: Insumo[]
   talhoes: Talhao[]
-  talhaoStats?: Record<string, TalhaoStat>
+  /** talhaoStats[talhaoId][insumoId] = stats de aplicação daquele insumo naquele talhão */
+  talhaoStats?: Record<string, Record<string, TalhaoStat>>
   initialTalhaoId?: string
 }
 
@@ -69,7 +70,10 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
   const selectedInsumo  = insumos.find((i) => i.id === insumoId)
   const availableQty    = insumoId ? (localQtys[insumoId] ?? 0) : 0
   const selectedTalhao  = talhoes.find((t) => t.id === talhaoId)
-  const selectedTalhaoStat = talhaoId ? talhaoStats[talhaoId] : null
+  // Stat específico do insumo selecionado no talhão selecionado
+  const selectedTalhaoStat = (talhaoId && insumoId)
+    ? (talhaoStats[talhaoId]?.[insumoId] ?? null)
+    : null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -210,14 +214,14 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
                 {selectedTalhaoStat && selectedTalhaoStat.accumArea > 0 ? (
                   <>
                     <span className="text-gray-500">
-                      Já aplicado:{' '}
+                      {selectedInsumo ? `${selectedInsumo.title} — já aplicado:` : 'Já aplicado:'}{' '}
                       <span className="font-medium text-green-400">
                         {selectedTalhaoStat.accumArea.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha
                       </span>
                     </span>
                     {selectedTalhaoStat.lastKgHa != null && (
                       <span className="text-gray-500">
-                        Última aplicação:{' '}
+                        Última taxa:{' '}
                         <span className="text-gray-300">
                           {selectedTalhaoStat.lastKgHa.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
                         </span>
@@ -229,8 +233,12 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
                       </span>
                     )}
                   </>
+                ) : insumoId ? (
+                  <span className="text-gray-600 italic">
+                    {selectedInsumo ? `${selectedInsumo.title}: nenhuma aplicação neste talhão` : 'Nenhuma área registrada ainda'}
+                  </span>
                 ) : (
-                  <span className="text-gray-600 italic">Nenhuma área registrada ainda</span>
+                  <span className="text-gray-600 italic">Selecione um insumo para ver o histórico</span>
                 )}
               </div>
             </div>

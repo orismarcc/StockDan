@@ -21,8 +21,8 @@ export default function ChangePasswordPage() {
       setError('Informe seu nome completo (mínimo 2 caracteres).')
       return
     }
-    if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.')
+    if (password.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.')
       return
     }
     if (password !== confirm) {
@@ -73,7 +73,7 @@ export default function ChangePasswordPage() {
         <Input
           label="Nova Senha"
           type="password"
-          placeholder="Mínimo 6 caracteres"
+          placeholder="Mínimo 8 caracteres"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

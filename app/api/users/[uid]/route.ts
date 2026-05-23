@@ -62,8 +62,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (name) updates.name = name
   if (role && ['admin', 'operario'].includes(role)) updates.role = role
   if (password) {
-    if (password.length < 6) {
-      return NextResponse.json({ error: 'Senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Senha deve ter pelo menos 8 caracteres.' }, { status: 400 })
     }
     updates.password_hash = await bcrypt.hash(password, 10)
     updates.must_change_password = false

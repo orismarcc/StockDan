@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
   if (!name || name.trim().length < 2) {
     return NextResponse.json({ error: 'Informe seu nome completo.' }, { status: 400 })
   }
-  if (!password || password.length < 6) {
-    return NextResponse.json({ error: 'Senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
+  if (!password || password.length < 8) {
+    return NextResponse.json({ error: 'Senha deve ter pelo menos 8 caracteres.' }, { status: 400 })
   }
 
   const hash = await bcrypt.hash(password, 10)

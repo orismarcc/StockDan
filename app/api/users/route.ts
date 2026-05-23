@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
   if (!['admin', 'operario'].includes(role)) {
     return NextResponse.json({ error: 'Role inválida.' }, { status: 400 })
   }
-  if (password.length < 6) {
-    return NextResponse.json({ error: 'Senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
+  if (password.length < 8) {
+    return NextResponse.json({ error: 'Senha deve ter pelo menos 8 caracteres.' }, { status: 400 })
   }
 
   const supabase = createServerClient()

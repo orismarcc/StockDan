@@ -9,6 +9,7 @@ import { TransactionTable, Transaction } from './TransactionTable'
 import { AddStockModal } from './AddStockModal'
 import { EditTransactionModal } from './EditTransactionModal'
 import { ConfirmDeleteButton } from './ConfirmDeleteButton'
+import { RegulagemModal } from './RegulagemModal'
 import { Button } from './ui/Button'
 
 type TabId = 'talhoes' | 'insumos' | 'historico'
@@ -33,6 +34,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
   const [addStockFor, setAddStockFor] = useState<{ id: string; title: string; unit: string } | null>(null)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const [editQtyFor, setEditQtyFor] = useState<{ id: string; title: string; unit: string; currentQty: number } | null>(null)
+  const [regulagemFor, setRegulagemFor] = useState<{ id: string; name: string } | null>(null)
   const router = useRouter()
 
   // Área acumulada por insumo por talhão
@@ -152,6 +154,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                         topInsumos={topInsumos}
                         userRole={userRole}
                         onDeleted={() => router.refresh()}
+                        onRegulagem={() => setRegulagemFor({ id: t.id, name: t.name })}
                       />
                     ))}
                   </tbody>
@@ -169,6 +172,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                     topInsumos={topInsumos}
                     userRole={userRole}
                     onDeleted={() => router.refresh()}
+                    onRegulagem={() => setRegulagemFor({ id: t.id, name: t.name })}
                   />
                 ))}
               </div>
@@ -266,6 +270,15 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
         </div>
       )}
 
+      {regulagemFor && (
+        <RegulagemModal
+          farmId={farm.id}
+          talhaoId={regulagemFor.id}
+          talhaoName={regulagemFor.name}
+          onClose={() => { setRegulagemFor(null); router.refresh() }}
+        />
+      )}
+
       {addStockFor && (
         <AddStockModal
           farmId={farm.id}
@@ -318,6 +331,7 @@ function TalhaoRow({
   topInsumos,
   userRole,
   onDeleted,
+  onRegulagem,
 }: {
   talhao: Talhao
   farmId: string
@@ -325,6 +339,7 @@ function TalhaoRow({
   topInsumos: string[]
   userRole: 'admin' | 'operario'
   onDeleted: () => void
+  onRegulagem: () => void
 }) {
   const areaHa = Number(t.area_ha)
 
@@ -368,6 +383,12 @@ function TalhaoRow({
           >
             + Aplicação
           </Link>
+          <button
+            onClick={onRegulagem}
+            className="inline-flex items-center gap-1 rounded-md border border-blue-600/30 bg-blue-600/10 px-2.5 py-1 text-xs font-medium text-blue-400 hover:bg-blue-600/20 hover:border-blue-500/50 transition-colors"
+          >
+            + Regulagem
+          </button>
           <Link
             href={`/farms/${farmId}/talhoes/${t.id}`}
             className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
@@ -398,6 +419,7 @@ function TalhaoCard({
   topInsumos,
   userRole,
   onDeleted,
+  onRegulagem,
 }: {
   talhao: Talhao
   farmId: string
@@ -405,6 +427,7 @@ function TalhaoCard({
   topInsumos: string[]
   userRole: 'admin' | 'operario'
   onDeleted: () => void
+  onRegulagem: () => void
 }) {
   const areaHa = Number(t.area_ha)
 
@@ -450,28 +473,40 @@ function TalhaoCard({
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-2">
-        <Link
-          href={`/farms/${farmId}/retirada?talhao=${t.id}`}
-          className="flex-1 rounded-lg border border-green-600/30 bg-green-600/10 py-2.5 text-center text-sm font-medium text-green-400 hover:bg-green-600/20 transition-colors"
-        >
-          + Aplicação
-        </Link>
-        <Link
-          href={`/farms/${farmId}/talhoes/${t.id}`}
-          className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 py-2.5 text-center text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-gray-100 transition-colors"
-        >
-          Detalhes
-        </Link>
-        {userRole === 'admin' && (
-          <ConfirmDeleteButton
-            onConfirm={async () => {
-              const res = await fetch(`/api/farms/${farmId}/talhoes/${t.id}`, { method: 'DELETE' })
-              if (!res.ok) throw new Error('Falha ao apagar talhão')
-              onDeleted()
-            }}
-          />
-        )}
+      <div className="mt-3 flex flex-col gap-2">
+        {/* Linha 1: + Aplicação | + Regulagem */}
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/farms/${farmId}/retirada?talhao=${t.id}`}
+            className="flex-1 rounded-lg border border-green-600/30 bg-green-600/10 py-2.5 text-center text-sm font-medium text-green-400 hover:bg-green-600/20 transition-colors"
+          >
+            + Aplicação
+          </Link>
+          <button
+            onClick={onRegulagem}
+            className="flex-1 rounded-lg border border-blue-600/30 bg-blue-600/10 py-2.5 text-center text-sm font-medium text-blue-400 hover:bg-blue-600/20 hover:border-blue-500/50 transition-colors"
+          >
+            + Regulagem
+          </button>
+        </div>
+        {/* Linha 2: Detalhes (largura total) + delete */}
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/farms/${farmId}/talhoes/${t.id}`}
+            className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 py-2.5 text-center text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-gray-100 transition-colors"
+          >
+            Detalhes
+          </Link>
+          {userRole === 'admin' && (
+            <ConfirmDeleteButton
+              onConfirm={async () => {
+                const res = await fetch(`/api/farms/${farmId}/talhoes/${t.id}`, { method: 'DELETE' })
+                if (!res.ok) throw new Error('Falha ao apagar talhão')
+                onDeleted()
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

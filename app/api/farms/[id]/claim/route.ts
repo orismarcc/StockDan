@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 
 type Params = { params: Promise<{ id: string }> }
 
 export async function POST(_req: NextRequest, { params }: Params) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }

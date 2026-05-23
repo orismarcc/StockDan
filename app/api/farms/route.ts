@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 
 export async function GET() {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
   const supabase = createServerClient()
@@ -31,7 +31,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }

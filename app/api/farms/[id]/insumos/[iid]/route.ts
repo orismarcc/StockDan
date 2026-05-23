@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
   const { id: farm_id, iid } = await params
@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
@@ -110,7 +110,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }

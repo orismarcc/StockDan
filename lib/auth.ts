@@ -45,4 +45,19 @@ export async function getSession(): Promise<SessionUser | null> {
   return verifyToken(token)
 }
 
+/**
+ * Like getSession(), but also returns null if the user has a pending
+ * password change (mustChangePassword = true).
+ * Use this in ALL API routes that require a fully-active session.
+ * The only routes that should still use getSession() are:
+ *   - /api/auth/login (no session yet)
+ *   - /api/auth/logout (any session can logout)
+ *   - /api/auth/change-password (needs mustChangePassword session to work)
+ */
+export async function getActiveSession(): Promise<SessionUser | null> {
+  const session = await getSession()
+  if (!session || session.mustChangePassword) return null
+  return session
+}
+
 export { COOKIE }

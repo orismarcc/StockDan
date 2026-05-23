@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { getSession } from '@/lib/auth'
+import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 
 type Params = { params: Promise<{ uid: string }> }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
@@ -35,7 +35,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
@@ -99,7 +99,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }

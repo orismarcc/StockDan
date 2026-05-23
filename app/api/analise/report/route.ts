@@ -1,6 +1,6 @@
 // app/api/analise/report/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -23,7 +23,7 @@ function fmtNum(n: number | null, decimals = 2) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getSession()
+  const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
   const sp = new URL(req.url).searchParams

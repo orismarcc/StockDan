@@ -176,7 +176,7 @@ export async function GET(req: NextRequest) {
 
     // ── Page chrome (header bar + footer bar) ──────────────────────────────
     function drawPageChrome() {
-      const pn = doc.getNumberOfPages()
+      const pn = (doc as unknown as { getNumberOfPages(): number }).getNumberOfPages()
 
       setF(GREEN)
       doc.rect(0, 0, PW, HDR, 'F')
@@ -468,10 +468,10 @@ export async function GET(req: NextRequest) {
           t.notes ?? '',
         ]),
         foot: [['', '', '', 'TOTAL', fmtNum(totalKg, 1), fmtNum(totalArea), '', '']],
-        styles:             { fontSize: 8.5, cellPadding: 2.8, lineColor: GRAY200 as number[], lineWidth: 0.2, overflow: 'linebreak' },
-        headStyles:         { fillColor: BLUE    as number[], textColor: WHITE as number[], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: GRAY050 as number[] },
-        footStyles:         { fillColor: GRAY800 as number[], textColor: WHITE as number[], fontStyle: 'bold' },
+        styles:             { fontSize: 8.5, cellPadding: 2.8, lineColor: GRAY200 as RGB, lineWidth: 0.2, overflow: 'linebreak' },
+        headStyles:         { fillColor: BLUE    as RGB, textColor: WHITE as RGB, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: GRAY050 as RGB },
+        footStyles:         { fillColor: GRAY800 as RGB, textColor: WHITE as RGB, fontStyle: 'bold' },
         columnStyles: {
           0: { cellWidth: 18 },
           4: { halign: 'right', cellWidth: 22 },
@@ -501,9 +501,9 @@ export async function GET(req: NextRequest) {
             area > 0 ? fmtNum(qty / area, 1) : '—',
             totalKg > 0 ? fmtNum((qty / totalKg) * 100, 1) + '%' : '—',
           ]),
-        styles:             { fontSize: 9, cellPadding: 3, lineColor: GRAY200 as number[], lineWidth: 0.2 },
-        headStyles:         { fillColor: GREEN   as number[], textColor: WHITE as number[], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: GRAY050 as number[] },
+        styles:             { fontSize: 9, cellPadding: 3, lineColor: GRAY200 as RGB, lineWidth: 0.2 },
+        headStyles:         { fillColor: GREEN   as RGB, textColor: WHITE as RGB, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: GRAY050 as RGB },
         columnStyles: {
           1: { halign: 'center', cellWidth: 28 },
           2: { halign: 'right',  cellWidth: 32 },
@@ -540,9 +540,9 @@ export async function GET(req: NextRequest) {
               area > 0 ? fmtNum(qty / area, 1) : '—',
             ]
           }),
-        styles:             { fontSize: 9, cellPadding: 3, lineColor: GRAY200 as number[], lineWidth: 0.2 },
-        headStyles:         { fillColor: AMBER   as number[], textColor: WHITE as number[], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: GRAY050 as number[] },
+        styles:             { fontSize: 9, cellPadding: 3, lineColor: GRAY200 as RGB, lineWidth: 0.2 },
+        headStyles:         { fillColor: AMBER   as RGB, textColor: WHITE as RGB, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: GRAY050 as RGB },
         columnStyles: {
           1: { halign: 'right',  cellWidth: 32 },
           2: { halign: 'center', cellWidth: 25 },
@@ -574,9 +574,9 @@ export async function GET(req: NextRequest) {
             count > 0 ? fmtNum(area / count) : '—',
             totalKg > 0 ? fmtNum((qty / totalKg) * 100, 1) + '%' : '—',
           ]),
-        styles:             { fontSize: 9, cellPadding: 3, lineColor: GRAY200 as number[], lineWidth: 0.2 },
-        headStyles:         { fillColor: PURPLE  as number[], textColor: WHITE as number[], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: GRAY050 as number[] },
+        styles:             { fontSize: 9, cellPadding: 3, lineColor: GRAY200 as RGB, lineWidth: 0.2 },
+        headStyles:         { fillColor: PURPLE  as RGB, textColor: WHITE as RGB, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: GRAY050 as RGB },
         columnStyles: {
           1: { halign: 'center', cellWidth: 25 },
           2: { halign: 'right',  cellWidth: 30 },

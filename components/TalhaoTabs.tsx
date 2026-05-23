@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn, formatDate, formatTime, formatQuantity } from '@/lib/utils'
 import { AreaCell } from './AreaCell'
 import { ImplementAdjustmentForm } from './ImplementAdjustmentForm'
@@ -408,7 +409,7 @@ export function TalhaoTabs({
           ) : (
             <div className="space-y-3">
               {adjustments.map((adj, idx) => (
-                <AdjustmentCard key={adj.id} adj={adj} isLatest={idx === 0} />
+                <AdjustmentCard key={adj.id} adj={adj} isLatest={idx === 0} farmId={farmId} talhaoId={talhaoId} />
               ))}
             </div>
           )}
@@ -420,8 +421,23 @@ export function TalhaoTabs({
 
 // ─── AdjustmentCard ──────────────────────────────────────────────────────────
 
-function AdjustmentCard({ adj, isLatest }: { adj: ImplementAdjustment; isLatest: boolean }) {
+function AdjustmentCard({
+  adj,
+  isLatest,
+  farmId,
+  talhaoId,
+}: {
+  adj: ImplementAdjustment
+  isLatest: boolean
+  farmId: string
+  talhaoId: string
+}) {
+  const router = useRouter()
   const [expanded, setExpanded] = useState(isLatest)
+  const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const date = new Date(adj.created_at)
   const dateStr = date.toLocaleDateString('pt-BR')
@@ -439,23 +455,54 @@ function AdjustmentCard({ adj, isLatest }: { adj: ImplementAdjustment; isLatest:
     { label: 'Comporta', value: adj.comporta },
   ].filter((f) => f.value)
 
+  // Dados pre-preenchidos para o formulário de edição (number → string)
+  const initialData = {
+    implemento:           adj.implemento           ?? '',
+    taxa_kgha:            adj.taxa_kgha            != null ? String(adj.taxa_kgha)            : '',
+    palhetas:             adj.palhetas             ?? '',
+    rpm_maquina:          adj.rpm_maquina          != null ? String(adj.rpm_maquina)          : '',
+    rpm_pratos_eixo:      adj.rpm_pratos_eixo      != null ? String(adj.rpm_pratos_eixo)      : '',
+    num_bandejas:         adj.num_bandejas         != null ? String(adj.num_bandejas)         : '',
+    espacamento_bandejas: adj.espacamento_bandejas ?? '',
+    cv_percent:           adj.cv_percent           != null ? String(adj.cv_percent)           : '',
+    faixa_aplicacao:      adj.faixa_aplicacao      ?? '',
+    comporta:             adj.comporta             ?? '',
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    setDeleteError('')
+    const res = await fetch(`/api/farms/${farmId}/implement-adjustments/${adj.id}`, {
+      method: 'DELETE',
+    })
+    setDeleting(false)
+    if (res.ok) {
+      router.refresh()
+    } else {
+      const data = await res.json().catch(() => ({}))
+      setDeleteError(data.error ?? 'Erro ao excluir regulagem')
+      setConfirmDelete(false)
+    }
+  }
+
   return (
     <div className={cn(
       'rounded-xl border bg-gray-900/40 overflow-hidden',
       isLatest ? 'border-green-500/30' : 'border-gray-800'
     )}>
       {/* Header */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-gray-800/30 transition-colors"
-      >
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="px-4 py-3 flex items-center gap-3 hover:bg-gray-800/20 transition-colors">
+        {/* Expand toggle — área clicável */}
+        <button
+          onClick={() => { setExpanded((v) => !v); setEditing(false) }}
+          className="flex flex-1 items-center gap-3 min-w-0 text-left"
+        >
           {isLatest && (
             <span className="shrink-0 rounded-full bg-green-500/20 px-2 py-0.5 text-[10px] font-semibold text-green-400 uppercase tracking-wider">
               Ativa
             </span>
           )}
-          <div className="text-left min-w-0">
+          <div className="min-w-0">
             <p className="text-sm font-medium text-gray-200 truncate">
               {adj.implemento ?? 'Implemento não especificado'}
             </p>
@@ -467,17 +514,106 @@ function AdjustmentCard({ adj, isLatest }: { adj: ImplementAdjustment; isLatest:
               {adj.users?.name && <span className="ml-2">· {adj.users.name}</span>}
             </p>
           </div>
-        </div>
-        <svg
-          className={cn('h-4 w-4 text-gray-600 shrink-0 transition-transform', expanded && 'rotate-180')}
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+        </button>
 
-      {/* Details */}
-      {expanded && fields.length > 0 && (
+        {/* Ações — fora do botão de expand para não colidir */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Botão Editar */}
+          <button
+            onClick={() => { setEditing((v) => !v); setExpanded(true); setConfirmDelete(false) }}
+            title="Editar regulagem"
+            className={cn(
+              'rounded-md p-1.5 transition-colors',
+              editing
+                ? 'bg-amber-500/20 text-amber-400'
+                : 'text-gray-600 hover:bg-gray-800 hover:text-gray-300'
+            )}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 7.125L18 8.625" />
+            </svg>
+          </button>
+
+          {/* Botão Excluir */}
+          <button
+            onClick={() => { setConfirmDelete((v) => !v); setEditing(false) }}
+            title="Excluir regulagem"
+            className={cn(
+              'rounded-md p-1.5 transition-colors',
+              confirmDelete
+                ? 'bg-red-500/20 text-red-400'
+                : 'text-gray-600 hover:bg-gray-800 hover:text-red-400'
+            )}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+          </button>
+
+          {/* Chevron expand */}
+          <button
+            onClick={() => { setExpanded((v) => !v); setEditing(false) }}
+            className="rounded-md p-1.5 text-gray-600 hover:bg-gray-800 hover:text-gray-300 transition-colors"
+          >
+            <svg
+              className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Confirmação de exclusão */}
+      {confirmDelete && (
+        <div className="border-t border-red-500/20 bg-red-500/5 px-4 py-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-red-400">Excluir esta regulagem permanentemente?</p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="rounded-md border border-gray-700 px-3 py-1 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-60 transition-colors"
+            >
+              {deleting ? 'Excluindo...' : 'Excluir'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Erro de exclusão */}
+      {deleteError && (
+        <div className="border-t border-red-500/20 px-4 py-2">
+          <p className="text-xs text-red-400">{deleteError}</p>
+        </div>
+      )}
+
+      {/* Formulário de edição inline */}
+      {editing && expanded && (
+        <div className="border-t border-amber-500/20 bg-amber-500/5 px-4 py-4">
+          <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-amber-400/80">
+            Editar Regulagem
+          </h4>
+          <ImplementAdjustmentForm
+            farmId={farmId}
+            talhaoId={talhaoId}
+            adjId={adj.id}
+            initialData={initialData}
+            onSuccess={() => setEditing(false)}
+            onCancel={() => setEditing(false)}
+          />
+        </div>
+      )}
+
+      {/* Detalhes expandidos (não mostra quando editando) */}
+      {expanded && !editing && fields.length > 0 && (
         <div className="border-t border-gray-800 px-4 py-3">
           <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
             {fields.map((f) => (
@@ -491,7 +627,7 @@ function AdjustmentCard({ adj, isLatest }: { adj: ImplementAdjustment; isLatest:
           </div>
         </div>
       )}
-      {expanded && fields.length === 0 && (
+      {expanded && !editing && fields.length === 0 && (
         <div className="border-t border-gray-800 px-4 py-3">
           <p className="text-xs text-gray-600 italic">Nenhum detalhe adicional registrado.</p>
         </div>

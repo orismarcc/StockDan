@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation'
 interface ImplementAdjustmentFormProps {
   farmId: string
   talhaoId: string
+  /** Quando informado, o formulário opera em modo edição (PATCH) */
+  adjId?: string
+  initialData?: Partial<FormData>
   onSuccess?: () => void
   onCancel?: () => void
 }
@@ -76,13 +79,17 @@ function Field({
 export function ImplementAdjustmentForm({
   farmId,
   talhaoId,
+  adjId,
+  initialData,
   onSuccess,
   onCancel,
 }: ImplementAdjustmentFormProps) {
   const router = useRouter()
-  const [form, setForm] = useState<FormData>(EMPTY)
+  const [form, setForm] = useState<FormData>({ ...EMPTY, ...initialData })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const isEditing = Boolean(adjId)
 
   function set(name: keyof FormData, value: string) {
     setForm((prev) => ({ ...prev, [name]: value }))
@@ -93,8 +100,12 @@ export function ImplementAdjustmentForm({
     setSaving(true)
     setError('')
 
-    const res = await fetch(`/api/farms/${farmId}/implement-adjustments`, {
-      method: 'POST',
+    const url = isEditing
+      ? `/api/farms/${farmId}/implement-adjustments/${adjId}`
+      : `/api/farms/${farmId}/implement-adjustments`
+
+    const res = await fetch(url, {
+      method: isEditing ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...form, talhao_id: talhaoId }),
     })
@@ -102,7 +113,7 @@ export function ImplementAdjustmentForm({
     setSaving(false)
 
     if (res.ok) {
-      setForm(EMPTY)
+      if (!isEditing) setForm(EMPTY)
       router.refresh()
       onSuccess?.()
     } else {
@@ -145,7 +156,7 @@ export function ImplementAdjustmentForm({
           disabled={saving}
           className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-60 transition-colors"
         >
-          {saving ? 'Salvando...' : 'Salvar Regulagem'}
+          {saving ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar Regulagem'}
         </button>
         {onCancel && (
           <button

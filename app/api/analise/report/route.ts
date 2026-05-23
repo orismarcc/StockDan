@@ -148,27 +148,30 @@ export async function GET(req: NextRequest) {
 
     const period = `${fmt(from)} a ${fmt(to)}`
 
-    // Palette
-    const GREEN  : RGB = [22, 163, 74]
-    const DARK   : RGB = [17, 24, 39]
-    const GRAY800: RGB = [31, 41, 55]
-    const GRAY600: RGB = [75, 85, 99]
-    const GRAY500: RGB = [107, 114, 128]
-    const GRAY400: RGB = [156, 163, 175]
-    const GRAY300: RGB = [209, 213, 219]
-    const GRAY200: RGB = [229, 231, 235]
-    const GRAY100: RGB = [243, 244, 246]
-    const GRAY050: RGB = [249, 250, 251]
-    const WHITE  : RGB = [255, 255, 255]
-    const BLUE   : RGB = [59, 130, 246]
-    const AMBER  : RGB = [245, 158, 11]
-    const PURPLE : RGB = [139, 92, 246]
-    const TEAL   : RGB = [20, 184, 166]
-    const ORANGE : RGB = [249, 115, 22]
-    const PINK   : RGB = [236, 72, 153]
-    const RED    : RGB = [239, 68, 68]
+    // Palette — alinhada ao tema do projeto (dark, green-500 brand)
+    const GREEN      : RGB = [34, 197, 94]   // green-500 — brand (#22c55e)
+    const GREEN_DARK : RGB = [21, 128, 61]   // green-700 — texto branco sobre fundo verde
+    const DARK       : RGB = [17, 24, 39]    // gray-900
+    const GRAY800    : RGB = [31, 41, 55]    // gray-800
+    const GRAY600    : RGB = [75, 85, 99]    // gray-600
+    const GRAY500    : RGB = [107, 114, 128] // gray-500
+    const GRAY400    : RGB = [156, 163, 175] // gray-400
+    const GRAY300    : RGB = [209, 213, 219] // gray-300
+    const GRAY200    : RGB = [229, 231, 235] // gray-200
+    const GRAY100    : RGB = [243, 244, 246] // gray-100
+    const GRAY050    : RGB = [249, 250, 251] // gray-50
+    const WHITE      : RGB = [255, 255, 255]
+    const BLUE       : RGB = [59, 130, 246]  // blue-500
+    const AMBER      : RGB = [245, 158, 11]  // amber-500
+    const AMBER_DARK : RGB = [180, 113, 0]   // amber-700 — texto branco sobre âmbar
+    const PURPLE     : RGB = [139, 92, 246]  // purple-500
+    const RED        : RGB = [239, 68, 68]   // red-500
+    const EMERALD    : RGB = [16, 185, 129]  // emerald-500
+    const CYAN       : RGB = [6, 182, 212]   // cyan-500
+    const ORANGE     : RGB = [249, 115, 22]  // orange-500
 
-    const BAR_PALETTE: RGB[] = [GREEN, BLUE, AMBER, PURPLE, RED, TEAL, ORANGE, PINK]
+    // Paleta dos gráficos de barras — cores do projeto Tailwind
+    const BAR_PALETTE: RGB[] = [GREEN, BLUE, AMBER, PURPLE, RED, EMERALD, CYAN, ORANGE]
 
     const setF = (c: RGB) => doc.setFillColor(c[0], c[1], c[2])
     const setT = (c: RGB) => doc.setTextColor(c[0], c[1], c[2])
@@ -178,7 +181,7 @@ export async function GET(req: NextRequest) {
     function drawPageChrome() {
       const pn = doc.getNumberOfPages()
 
-      setF(GREEN)
+      setF(GREEN_DARK)
       doc.rect(0, 0, PW, HDR, 'F')
 
       doc.setFont('helvetica', 'bold')
@@ -502,7 +505,7 @@ export async function GET(req: NextRequest) {
             totalKg > 0 ? fmtNum((qty / totalKg) * 100, 1) + '%' : '—',
           ]),
         styles:             { fontSize: 9, cellPadding: 3, lineColor: GRAY200 as number[], lineWidth: 0.2 },
-        headStyles:         { fillColor: GREEN   as number[], textColor: WHITE as number[], fontStyle: 'bold' },
+        headStyles:         { fillColor: GREEN_DARK as number[], textColor: WHITE as number[], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: GRAY050 as number[] },
         columnStyles: {
           1: { halign: 'center', cellWidth: 28 },
@@ -541,7 +544,7 @@ export async function GET(req: NextRequest) {
             ]
           }),
         styles:             { fontSize: 9, cellPadding: 3, lineColor: GRAY200 as number[], lineWidth: 0.2 },
-        headStyles:         { fillColor: AMBER   as number[], textColor: WHITE as number[], fontStyle: 'bold' },
+        headStyles:         { fillColor: AMBER_DARK as number[], textColor: WHITE as number[], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: GRAY050 as number[] },
         columnStyles: {
           1: { halign: 'right',  cellWidth: 32 },
@@ -601,18 +604,41 @@ export async function GET(req: NextRequest) {
   const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
 
+  // Helper: aplica largura de colunas e auto-filtro em uma planilha
+  function xlsxMeta(ws: ReturnType<typeof XLSX.utils.json_to_sheet>, colWidths: number[], filterCols: number) {
+    ws['!cols'] = colWidths.map(wch => ({ wch }))
+    const lastCol = String.fromCharCode(64 + filterCols) // A=1, B=2...
+    ws['!autofilter'] = { ref: `A1:${lastCol}1` }
+  }
+
   if (sections.includes('transactions') || sections.includes('summary')) {
-    const rows = txs.map(t => ({
-      Data: fmt(t.date),
-      Insumo: insumoMap[t.insumo_id] ?? '—',
-      Talhão: t.talhao_id ? (talhaoMap[t.talhao_id]?.name ?? '—') : '—',
-      Operador: t.user_id ? (userMap[t.user_id] ?? '—') : '—',
-      'Quantidade (kg)': Number(t.quantity),
-      'Área (ha)': t.area_ha ? Number(t.area_ha) : null,
-      'kg/ha': t.area_ha && t.area_ha > 0 ? Number(t.quantity) / Number(t.area_ha) : null,
-      Observação: t.notes ?? '',
-    }))
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Aplicações')
+    const totalKgXlsx   = txs.reduce((s, t) => s + Number(t.quantity), 0)
+    const totalAreaXlsx = txs.filter(t => t.area_ha && t.area_ha > 0).reduce((s, t) => s + Number(t.area_ha), 0)
+
+    const rows = [
+      // Cabeçalho de contexto
+      { Data: `Fazenda: ${farmName}`, Insumo: `Período: ${fmt(from)} a ${fmt(to)}`, Talhão: '', Operador: '', 'Quantidade (kg)': null, 'Área (ha)': null, 'kg/ha': null, Observação: '' },
+      // Linha em branco separadora
+      { Data: '', Insumo: '', Talhão: '', Operador: '', 'Quantidade (kg)': null, 'Área (ha)': null, 'kg/ha': null, Observação: '' },
+      // Dados
+      ...txs.map(t => ({
+        Data:             fmt(t.date),
+        Insumo:           insumoMap[t.insumo_id] ?? '—',
+        Talhão:           t.talhao_id ? (talhaoMap[t.talhao_id]?.name ?? '—') : '—',
+        Operador:         t.user_id ? (userMap[t.user_id] ?? '—') : '—',
+        'Quantidade (kg)': Number(t.quantity),
+        'Área (ha)':       t.area_ha ? Number(t.area_ha) : null,
+        'kg/ha':           t.area_ha && t.area_ha > 0 ? Number(t.quantity) / Number(t.area_ha) : null,
+        Observação:        t.notes ?? '',
+      })),
+      // Linha em branco
+      { Data: '', Insumo: '', Talhão: '', Operador: '', 'Quantidade (kg)': null, 'Área (ha)': null, 'kg/ha': null, Observação: '' },
+      // Totais
+      { Data: 'TOTAL', Insumo: `${txs.length} aplicações`, Talhão: '', Operador: '', 'Quantidade (kg)': totalKgXlsx, 'Área (ha)': totalAreaXlsx, 'kg/ha': totalAreaXlsx > 0 ? totalKgXlsx / totalAreaXlsx : null, Observação: '' },
+    ]
+    const ws = XLSX.utils.json_to_sheet(rows)
+    xlsxMeta(ws, [12, 24, 18, 18, 16, 12, 10, 35], 8)
+    XLSX.utils.book_append_sheet(wb, ws, 'Aplicações')
   }
 
   if (sections.includes('by_insumo')) {
@@ -623,14 +649,20 @@ export async function GET(req: NextRequest) {
       byInsumo2[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
       byInsumo2[t.insumo_id].count += 1
     }
-    const rows = Object.entries(byInsumo2).map(([id, { qty, area, count }]) => ({
-      Insumo: insumoMap[id] ?? id,
-      Registros: count,
-      'Total kg': qty,
-      'Área (ha)': area,
-      'kg/ha médio': area > 0 ? qty / area : null,
-    }))
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Por Insumo')
+    const totalKgXlsx = Object.values(byInsumo2).reduce((s, d) => s + d.qty, 0)
+    const rows = Object.entries(byInsumo2)
+      .sort(([, a], [, b]) => b.qty - a.qty)
+      .map(([id, { qty, area, count }]) => ({
+        Insumo:              insumoMap[id] ?? id,
+        Aplicações:          count,
+        'Total (kg)':        qty,
+        'Área total (ha)':   area || null,
+        'Taxa média (kg/ha)': area > 0 ? qty / area : null,
+        '% do total':        totalKgXlsx > 0 ? qty / totalKgXlsx : null,
+      }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    xlsxMeta(ws, [28, 12, 14, 16, 18, 12], 6)
+    XLSX.utils.book_append_sheet(wb, ws, 'Por Insumo')
   }
 
   if (sections.includes('by_talhao')) {
@@ -642,20 +674,24 @@ export async function GET(req: NextRequest) {
       byTalhao2[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
       byTalhao2[t.talhao_id].count += 1
     }
-    const rows = Object.entries(byTalhao2).map(([id, { qty, area, count }]) => {
-      const talhao  = talhaoMap[id]
-      const totalHa = talhao ? Number(talhao.area_ha) : 0
-      return {
-        Talhão: talhao?.name ?? id,
-        'Área total (ha)': totalHa,
-        Registros: count,
-        'Total kg': qty,
-        'Área aplicada (ha)': area,
-        'Cobertura (%)': totalHa > 0 ? Math.min(100, (area / totalHa) * 100) : null,
-        'kg/ha médio': area > 0 ? qty / area : null,
-      }
-    })
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Por Talhão')
+    const rows = Object.entries(byTalhao2)
+      .sort(([, a], [, b]) => b.qty - a.qty)
+      .map(([id, { qty, area, count }]) => {
+        const talhao  = talhaoMap[id]
+        const totalHa = talhao ? Number(talhao.area_ha) : 0
+        return {
+          Talhão:               talhao?.name ?? id,
+          'Área cadastrada (ha)': totalHa || null,
+          Aplicações:           count,
+          'Total (kg)':         qty,
+          'Área aplicada (ha)': area || null,
+          'Cobertura (%)':      totalHa > 0 ? Math.min(100, (area / totalHa) * 100) : null,
+          'Taxa média (kg/ha)': area > 0 ? qty / area : null,
+        }
+      })
+    const ws = XLSX.utils.json_to_sheet(rows)
+    xlsxMeta(ws, [22, 20, 12, 14, 18, 14, 18], 7)
+    XLSX.utils.book_append_sheet(wb, ws, 'Por Talhão')
   }
 
   if (sections.includes('operators')) {
@@ -667,16 +703,20 @@ export async function GET(req: NextRequest) {
       byUser2[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
       byUser2[uid].count += 1
     }
+    const totalKgXlsx = Object.values(byUser2).reduce((s, d) => s + d.qty, 0)
     const rows = Object.entries(byUser2)
-      .sort(([, a], [, b]) => b.area - a.area)
+      .sort(([, a], [, b]) => b.qty - a.qty)
       .map(([uid, { qty, area, count }]) => ({
-        Operador: userMap[uid] ?? 'Desconhecido',
-        Registros: count,
-        'Total kg': qty,
-        'Área trabalhada (ha)': area,
-        'Média por registro (ha)': count > 0 ? area / count : null,
+        Operador:               userMap[uid] ?? 'Desconhecido',
+        Aplicações:             count,
+        'Total (kg)':           qty,
+        'Área trabalhada (ha)': area || null,
+        'Média/aplicação (ha)': count > 0 ? area / count : null,
+        '% do total kg':        totalKgXlsx > 0 ? qty / totalKgXlsx : null,
       }))
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Operadores')
+    const ws = XLSX.utils.json_to_sheet(rows)
+    xlsxMeta(ws, [24, 12, 14, 20, 20, 14], 6)
+    XLSX.utils.book_append_sheet(wb, ws, 'Operadores')
   }
 
   if (wb.SheetNames.length === 0)

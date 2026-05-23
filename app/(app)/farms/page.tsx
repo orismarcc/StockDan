@@ -22,28 +22,42 @@ async function getFarmsWithStats(userId: string, role: string) {
     farmsData = (data ?? []).map((r: any) => r.farms).filter(Boolean)
   }
 
-  return Promise.all(
-    farmsData.map(async (farm) => {
-      const [{ data: insumos }, { count: talhaoCount }] = await Promise.all([
-        supabase.from('insumos').select('quantity, min_quantity').eq('farm_id', farm.id),
-        supabase.from('talhoes').select('*', { count: 'exact', head: true }).eq('farm_id', farm.id),
-      ])
+  if (farmsData.length === 0) return []
 
-      const list = insumos ?? []
-      return {
-        ...farm,
-        insumoCount: list.length,
-        talhaoCount: talhaoCount ?? 0,
-        emptyCount: list.filter((i: any) => Number(i.quantity) <= 0).length,
-        lowCount: list.filter(
-          (i: any) =>
-            Number(i.quantity) > 0 &&
-            i.min_quantity != null &&
-            Number(i.quantity) <= Number(i.min_quantity)
-        ).length,
-      }
-    })
-  )
+  // 2 queries batch em vez de 2N queries individuais por fazenda
+  const farmIds = farmsData.map((f) => f.id)
+  const [{ data: allInsumos }, { data: allTalhoes }] = await Promise.all([
+    supabase.from('insumos').select('farm_id, quantity, min_quantity').in('farm_id', farmIds),
+    supabase.from('talhoes').select('farm_id').in('farm_id', farmIds),
+  ])
+
+  const insumosByFarm = new Map<string, { quantity: number; min_quantity: number | null }[]>()
+  for (const ins of allInsumos ?? []) {
+    const list = insumosByFarm.get(ins.farm_id) ?? []
+    list.push(ins)
+    insumosByFarm.set(ins.farm_id, list)
+  }
+
+  const talhaoCountByFarm = new Map<string, number>()
+  for (const t of allTalhoes ?? []) {
+    talhaoCountByFarm.set(t.farm_id, (talhaoCountByFarm.get(t.farm_id) ?? 0) + 1)
+  }
+
+  return farmsData.map((farm) => {
+    const list = insumosByFarm.get(farm.id) ?? []
+    return {
+      ...farm,
+      insumoCount: list.length,
+      talhaoCount: talhaoCountByFarm.get(farm.id) ?? 0,
+      emptyCount: list.filter((i) => Number(i.quantity) <= 0).length,
+      lowCount: list.filter(
+        (i) =>
+          Number(i.quantity) > 0 &&
+          i.min_quantity != null &&
+          Number(i.quantity) <= Number(i.min_quantity)
+      ).length,
+    }
+  })
 }
 
 export default async function FarmsPage() {

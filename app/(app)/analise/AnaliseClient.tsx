@@ -2,15 +2,22 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { AnaliseFilters, type FilterState } from './AnaliseFilters'
 import type { AnaliseData, TxRow } from './types'
 import { KpiCards } from './KpiCards'
-import { BarInsumo } from './charts/BarInsumo'
-import { AreaTempo } from './charts/AreaTempo'
-import { DonutTalhao } from './charts/DonutTalhao'
-import { BarKgHa } from './charts/BarKgHa'
 import { OperadoresSection } from './OperadoresSection'
 import { ReportModal } from './ReportModal'
+
+// Recharts (~500 KB) carregado sob demanda — bundle inicial não inclui a lib
+const BarInsumo  = dynamic(() => import('./charts/BarInsumo').then(m => ({ default: m.BarInsumo })),  { ssr: false, loading: () => <ChartSkeleton /> })
+const AreaTempo  = dynamic(() => import('./charts/AreaTempo').then(m => ({ default: m.AreaTempo })),  { ssr: false, loading: () => <ChartSkeleton /> })
+const DonutTalhao = dynamic(() => import('./charts/DonutTalhao').then(m => ({ default: m.DonutTalhao })), { ssr: false, loading: () => <ChartSkeleton /> })
+const BarKgHa    = dynamic(() => import('./charts/BarKgHa').then(m => ({ default: m.BarKgHa })),    { ssr: false, loading: () => <ChartSkeleton /> })
+
+function ChartSkeleton() {
+  return <div className="h-48 animate-pulse rounded-xl border border-gray-800 bg-gray-900/40" />
+}
 
 function todayISO() { return new Date().toISOString().split('T')[0] }
 function startOfMonthISO() {

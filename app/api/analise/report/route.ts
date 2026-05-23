@@ -2,9 +2,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
 
 type Format = 'pdf' | 'xlsx'
 type Section = 'summary' | 'transactions' | 'by_insumo' | 'by_talhao' | 'operators'
@@ -110,6 +107,10 @@ export async function GET(req: NextRequest) {
 
   // ─── PDF ────────────────────────────────────────────────────────────────────
   if (format === 'pdf') {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ])
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
 
     // Header
@@ -293,6 +294,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ─── EXCEL ──────────────────────────────────────────────────────────────────
+  const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
 
   if (sections.includes('transactions') || sections.includes('summary')) {

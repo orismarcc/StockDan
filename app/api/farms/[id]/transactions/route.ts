@@ -43,7 +43,10 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { data, error, count } = await query
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
 
-  const headers = new Headers({ 'X-Total-Count': String(count ?? 0) })
+  const headers = new Headers({
+    'X-Total-Count': String(count ?? 0),
+    'Cache-Control': 'private, max-age=15, stale-while-revalidate=30',
+  })
   return NextResponse.json(data, { headers })
 }
 

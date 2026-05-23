@@ -24,7 +24,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .order('name')
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-  return NextResponse.json(data)
+  return NextResponse.json(data, {
+    headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+  })
 }
 
 export async function POST(req: NextRequest, { params }: Params) {

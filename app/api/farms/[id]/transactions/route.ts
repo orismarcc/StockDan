@@ -79,6 +79,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       .from('transactions')
       .select('*, insumos(title, unit), talhoes(id, name), users(name)')
       .eq('offline_id', offline_id)
+      .eq('farm_id', farm_id)
       .maybeSingle()
 
     if (existing) {

@@ -7,14 +7,15 @@ export async function checkFarmAccess(
   farmId: string
 ): Promise<boolean> {
   if (session.role === 'admin') {
-    // Admin acessa somente suas próprias fazendas (ou legadas com owner_id NULL)
+    // Admin acessa somente suas próprias fazendas
+    // Nota: fazendas sem owner (owner_id = null) são acessadas APENAS via /api/farms/[id]/claim
     const { data } = await supabase
       .from('farms')
       .select('id, owner_id')
       .eq('id', farmId)
       .single()
     if (!data) return false
-    return data.owner_id === null || data.owner_id === session.id
+    return data.owner_id === session.id
   }
 
   const { data } = await supabase

@@ -73,21 +73,24 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   if (Array.isArray(farm_ids)) {
-    // Valida que todas as fazendas pertencem ao admin solicitante
-    let allowedFarmIds: string[] = []
-    if (farm_ids.length > 0) {
-      const { data: ownedFarms } = await supabase
-        .from('farms')
-        .select('id')
-        .eq('owner_id', session.id)
-        .in('id', farm_ids)
-      allowedFarmIds = (ownedFarms ?? []).map((f: { id: string }) => f.id)
-    }
+    // Busca TODAS as fazendas do admin para escopar corretamente o delete
+    const { data: adminFarms } = await supabase
+      .from('farms')
+      .select('id')
+      .eq('owner_id', session.id)
+    const adminFarmIds = (adminFarms ?? []).map((f: { id: string }) => f.id)
 
-    await supabase.from('farm_users').delete().eq('user_id', uid)
+    // Apenas fazendas da lista que pertencem a este admin
+    const allowedFarmIds = farm_ids.filter((fid: string) => adminFarmIds.includes(fid))
+
+    // Delete escopado: remove APENAS associações de fazendas deste admin
+    // (preserva associações de outros admins intactas)
+    if (adminFarmIds.length > 0) {
+      await supabase.from('farm_users').delete().eq('user_id', uid).in('farm_id', adminFarmIds)
+    }
     if (allowedFarmIds.length > 0) {
       await supabase.from('farm_users').insert(
-        allowedFarmIds.map((fid) => ({ user_id: uid, farm_id: fid }))
+        allowedFarmIds.map((fid: string) => ({ user_id: uid, farm_id: fid }))
       )
     }
   }

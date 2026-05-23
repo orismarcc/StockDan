@@ -1,3 +1,7 @@
+// Nota: este limitador usa memória de processo (in-process Map).
+// Em ambientes serverless (Vercel) com múltiplas instâncias simultâneas, cada instância
+// mantém seu próprio contador independente — o limite é por instância, não global.
+// Para produção de alta escala, substituir por Redis/Upstash com contador compartilhado.
 const attempts = new Map<string, { count: number; resetAt: number }>()
 
 const MAX_ATTEMPTS = 5

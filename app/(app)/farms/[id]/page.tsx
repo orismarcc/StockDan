@@ -7,8 +7,11 @@ import { FarmTabs } from '@/components/FarmTabs'
 import { DeleteFarmButton } from '@/components/DeleteFarmButton'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession()
+  if (!session) return { title: 'Fazenda' }
   const { id } = await params
   const supabase = createServerClient()
+  if (!(await checkFarmAccess(supabase, session, id))) return { title: 'Fazenda' }
   const { data } = await supabase.from('farms').select('name').eq('id', id).single()
   return { title: data?.name ?? 'Fazenda' }
 }

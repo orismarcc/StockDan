@@ -10,9 +10,12 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string; tid: string }>
 }) {
-  const { tid } = await params
+  const session = await getSession()
+  if (!session) return { title: 'Talhão' }
+  const { id: farmId, tid } = await params
   const supabase = createServerClient()
-  const { data } = await supabase.from('talhoes').select('name').eq('id', tid).single()
+  if (!(await checkFarmAccess(supabase, session, farmId))) return { title: 'Talhão' }
+  const { data } = await supabase.from('talhoes').select('name').eq('id', tid).eq('farm_id', farmId).single()
   return { title: data?.name ?? 'Talhão' }
 }
 

@@ -2,15 +2,19 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { checkFarmAccess } from '@/lib/farmAccess'
 import { formatQuantity } from '@/lib/utils'
 import { StockBadge } from '@/components/StockBadge'
 import { TransactionTable } from '@/components/TransactionTable'
 import { InsumoActions } from '@/components/InsumoActions'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; iid: string }> }) {
-  const { iid } = await params
+  const session = await getSession()
+  if (!session) return { title: 'Insumo' }
+  const { id: farm_id, iid } = await params
   const supabase = createServerClient()
-  const { data } = await supabase.from('insumos').select('title').eq('id', iid).single()
+  if (!(await checkFarmAccess(supabase, session, farm_id))) return { title: 'Insumo' }
+  const { data } = await supabase.from('insumos').select('title').eq('id', iid).eq('farm_id', farm_id).single()
   return { title: data?.title ?? 'Insumo' }
 }
 

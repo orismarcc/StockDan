@@ -48,22 +48,27 @@ export function useSyncQueue() {
           offlineQueue.remove(item.id)
           synced++
         } else if (res.status === 422) {
-          // Estoque insuficiente no servidor: remove da fila e registra como rejeitado
           const body = await res.json().catch(() => ({}))
           offlineQueue.remove(item.id)
           rejected.push({ item, reason: body.error ?? 'Estoque insuficiente no servidor.' })
         } else {
-          offlineQueue.incrementRetry(item.id)
+          const exhausted = offlineQueue.incrementRetry(item.id)
+          if (exhausted) {
+            rejected.push({ item, reason: 'Máximo de tentativas atingido. Verifique a conexão.' })
+          }
         }
       } catch {
-        offlineQueue.incrementRetry(item.id)
+        const exhausted = offlineQueue.incrementRetry(item.id)
+        if (exhausted) {
+          rejected.push({ item, reason: 'Máximo de tentativas atingido. Verifique a conexão.' })
+        }
       }
     }
 
     setSyncing(false)
     setPendingCount(offlineQueue.count())
     setRejectedItems(rejected)
-    if (synced > 0) router.refresh()
+    if (synced > 0 || rejected.length > 0) router.refresh()
     return { synced, rejected }
   }, [router])
 

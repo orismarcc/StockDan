@@ -41,13 +41,61 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   const body = await req.json()
-  const { title, description, min_quantity, quantity } = body
+  const { title, description, min_quantity, quantity, adjustment_notes } = body
 
+  // ── Quantity adjustment: optimistic lock + audit trail ─────────────────────
+  if (quantity !== undefined) {
+    const { data: current } = await supabase
+      .from('insumos')
+      .select('quantity')
+      .eq('id', iid)
+      .eq('farm_id', farm_id)
+      .single()
+
+    if (!current) return NextResponse.json({ error: 'Insumo não encontrado.' }, { status: 404 })
+
+    const oldQty = Number(current.quantity)
+    const newQty = Number(quantity)
+
+    if (newQty < 0) return NextResponse.json({ error: 'Estoque não pode ser negativo.' }, { status: 400 })
+
+    const { data, error } = await supabase
+      .from('insumos')
+      .update({ quantity: newQty })
+      .eq('id', iid)
+      .eq('farm_id', farm_id)
+      .eq('quantity', oldQty)
+      .select()
+      .single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!data) return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
+
+    const delta = newQty - oldQty
+    if (Math.abs(delta) > 0.0001) {
+      await supabase.from('transactions').insert({
+        farm_id,
+        insumo_id: iid,
+        user_id: session.id,
+        type: delta > 0 ? 'entrada' : 'saida',
+        quantity: Math.abs(delta),
+        date: new Date().toISOString().split('T')[0],
+        notes: `Ajuste manual${adjustment_notes ? ': ' + adjustment_notes : ''}`,
+      })
+    }
+
+    return NextResponse.json(data)
+  }
+
+  // ── Metadata update (title, description, min_quantity) ─────────────────────
   const updateData: Record<string, unknown> = {}
   if (title !== undefined) updateData.title = title
   if (description !== undefined) updateData.description = description || null
   if (min_quantity !== undefined) updateData.min_quantity = min_quantity != null ? Number(min_quantity) : null
-  if (quantity !== undefined) updateData.quantity = Number(quantity)
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: 'Nenhum campo para atualizar.' }, { status: 400 })
+  }
 
   const { data, error } = await supabase
     .from('insumos')

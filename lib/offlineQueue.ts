@@ -26,7 +26,11 @@ function write(items: QueueItem[]) {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(items))
 }
 
+const MAX_RETRIES = 5
+
 export const offlineQueue = {
+  MAX_RETRIES,
+
   getAll: read,
 
   add(item: Omit<QueueItem, 'id' | 'created_at' | 'retries'>): QueueItem {
@@ -44,8 +48,17 @@ export const offlineQueue = {
     write(read().filter((i) => i.id !== id))
   },
 
-  incrementRetry(id: string) {
-    write(read().map((i) => (i.id === id ? { ...i, retries: i.retries + 1 } : i)))
+  // Returns true if the item was removed because it exceeded MAX_RETRIES
+  incrementRetry(id: string): boolean {
+    const items = read()
+    const updated = items.map((i) => (i.id === id ? { ...i, retries: i.retries + 1 } : i))
+    const item = updated.find((i) => i.id === id)
+    if (item && item.retries >= MAX_RETRIES) {
+      write(items.filter((i) => i.id !== id))
+      return true
+    }
+    write(updated)
+    return false
   },
 
   count(): number {

@@ -38,12 +38,17 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const newQty = Number(insumo.quantity) + Number(quantity)
 
-  const { error: updateErr } = await supabase
+  const { data: updated, error: updateErr } = await supabase
     .from('insumos')
     .update({ quantity: newQty })
     .eq('id', insumo_id)
+    .eq('quantity', Number(insumo.quantity))
+    .select('quantity')
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+  if (!updated || updated.length === 0) {
+    return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
+  }
 
   const { data: tx, error: txErr } = await supabase
     .from('transactions')

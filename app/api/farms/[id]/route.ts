@@ -59,7 +59,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   return NextResponse.json(data)
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
@@ -72,8 +72,34 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
+  // Conta transações existentes (deleção da fazenda apaga tudo em cascata)
+  const { count: txCount } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('farm_id', id)
+
+  const transactionCount = txCount ?? 0
+
+  // Requer confirmação explícita quando há histórico
+  const { searchParams } = new URL(req.url)
+  if (transactionCount > 0 && searchParams.get('confirm') !== 'true') {
+    return NextResponse.json(
+      {
+        error: `Esta fazenda possui ${transactionCount} transação(ões) no histórico. ` +
+               `Todas serão excluídas permanentemente junto com insumos e talhões. ` +
+               `Repita a requisição com ?confirm=true para confirmar.`,
+        transactionCount,
+        requiresConfirmation: true,
+      },
+      { status: 409 }
+    )
+  }
+
   const { error } = await supabase.from('farms').delete().eq('id', id)
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({
+    ok: true,
+    ...(transactionCount > 0 && { deletedTransactions: transactionCount }),
+  })
 }

@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
+import { parseRpcError } from '@/lib/rpcErrors'
 
 type Params = { params: Promise<{ id: string; tid: string }> }
 
@@ -21,9 +22,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { quantity, date, talhao_id, notes, area_ha } = body
 
-  // ── Atualização de área aplicada ──────────────────────────────────────────
-  // Qualquer usuário com acesso à fazenda pode registrar a área.
-  // Não toca no estoque.
+  // ── Atualização de área aplicada (qualquer usuário com acesso à fazenda) ────
+  // Não toca no estoque — sem necessidade de RPC.
   if (area_ha !== undefined && quantity === undefined && date === undefined) {
     const ha = Number(area_ha)
     if (isNaN(ha) || ha <= 0) {
@@ -49,61 +49,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Quantidade e data são obrigatórios.' }, { status: 400 })
   }
 
-  const { data: tx } = await supabase
-    .from('transactions')
-    .select('id, type, quantity, insumo_id, talhao_id, farm_id')
-    .eq('id', tid)
-    .eq('farm_id', farm_id)
-    .single()
+  // RPC atômica: ajusta estoque + atualiza transaction em uma transação PostgreSQL
+  const { data: rpc, error } = await supabase.rpc('editar_transacao', {
+    p_tid:       tid,
+    p_farm_id:   farm_id,
+    p_quantity:  Number(quantity),
+    p_date:      date,
+    p_talhao_id: talhao_id || null,
+    p_notes:     notes ?? null,
+  })
 
-  if (!tx) return NextResponse.json({ error: 'Transação não encontrada.' }, { status: 404 })
-
-  const { data: insumo } = await supabase
-    .from('insumos')
-    .select('quantity')
-    .eq('id', tx.insumo_id)
-    .single()
-
-  if (!insumo) return NextResponse.json({ error: 'Insumo não encontrado.' }, { status: 404 })
-
-  const origQty = Number(tx.quantity)
-  const newQty = Number(quantity)
-  const currentStock = Number(insumo.quantity)
-
-  const newStock = tx.type === 'saida'
-    ? currentStock + origQty - newQty
-    : currentStock - origQty + newQty
-
-  if (newStock < 0) {
-    return NextResponse.json(
-      { error: `Estoque insuficiente para esta edição. Disponível: ${currentStock}` },
-      { status: 422 }
-    )
+  if (error) {
+    const { status, message } = parseRpcError(error)
+    return NextResponse.json({ error: message }, { status })
   }
 
-  const { data: stockUpdated, error: stockErr } = await supabase
-    .from('insumos')
-    .update({ quantity: newStock })
-    .eq('id', tx.insumo_id)
-    .eq('quantity', currentStock)
-    .select('quantity')
+  const { transaction_id } = rpc as { transaction_id: string; new_quantity: number }
 
-  if (stockErr) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-  if (!stockUpdated || stockUpdated.length === 0) {
-    return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
-  }
-
-  const { data: updated, error: txErr } = await supabase
+  // Busca transaction atualizada com joins para o response
+  const { data: updated } = await supabase
     .from('transactions')
-    .update({ quantity: newQty, date, talhao_id: talhao_id || tx.talhao_id, notes: notes ?? null })
-    .eq('id', tid)
     .select('*, insumos(title, unit), talhoes(id, name), users(name)')
+    .eq('id', transaction_id)
     .single()
-
-  if (txErr) {
-    await supabase.from('insumos').update({ quantity: currentStock }).eq('id', tx.insumo_id)
-    return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-  }
 
   return NextResponse.json({ ok: true, transaction: updated })
 }
@@ -121,48 +89,15 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
-  const { data: tx } = await supabase
-    .from('transactions')
-    .select('id, type, quantity, insumo_id, farm_id')
-    .eq('id', tid)
-    .eq('farm_id', farm_id)
-    .single()
+  // RPC atômica: restaura estoque + deleta transaction em uma transação PostgreSQL
+  const { error } = await supabase.rpc('excluir_transacao', {
+    p_tid:     tid,
+    p_farm_id: farm_id,
+  })
 
-  if (!tx) return NextResponse.json({ error: 'Transação não encontrada.' }, { status: 404 })
-
-  const { data: insumo } = await supabase
-    .from('insumos')
-    .select('quantity')
-    .eq('id', tx.insumo_id)
-    .single()
-
-  if (!insumo) return NextResponse.json({ error: 'Insumo não encontrado.' }, { status: 404 })
-
-  const origQty = Number(tx.quantity)
-  const currentStock = Number(insumo.quantity)
-  const restoredStock = tx.type === 'saida' ? currentStock + origQty : currentStock - origQty
-
-  if (restoredStock < 0) {
-    return NextResponse.json({ error: 'Não é possível excluir: estoque ficaria negativo.' }, { status: 422 })
-  }
-
-  const { data: stockUpdated, error: stockErr } = await supabase
-    .from('insumos')
-    .update({ quantity: restoredStock })
-    .eq('id', tx.insumo_id)
-    .eq('quantity', currentStock)
-    .select('quantity')
-
-  if (stockErr) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-  if (!stockUpdated || stockUpdated.length === 0) {
-    return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
-  }
-
-  const { error: delErr } = await supabase.from('transactions').delete().eq('id', tid)
-
-  if (delErr) {
-    await supabase.from('insumos').update({ quantity: currentStock }).eq('id', tx.insumo_id)
-    return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
+  if (error) {
+    const { status, message } = parseRpcError(error)
+    return NextResponse.json({ error: message }, { status })
   }
 
   return NextResponse.json({ ok: true })

@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
+import { parseRpcError } from '@/lib/rpcErrors'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -51,32 +52,22 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Unidade inválida. Use kg.' }, { status: 400 })
   }
 
-  const { data: insumo, error: insError } = await supabase
-    .from('insumos')
-    .insert({
-      farm_id,
-      title,
-      description: description || null,
-      unit,
-      quantity: Number(quantity),
-      min_quantity: min_quantity ? Number(min_quantity) : null,
-    })
-    .select()
-    .single()
+  // RPC atômica: INSERT insumos + INSERT transactions (estoque inicial) em uma transação
+  const { data: rpc, error } = await supabase.rpc('criar_insumo', {
+    p_farm_id:      farm_id,
+    p_user_id:      session.id,
+    p_title:        title,
+    p_description:  description || null,
+    p_unit:         unit,
+    p_quantity:     Number(quantity),
+    p_min_quantity: min_quantity ? Number(min_quantity) : null,
+    p_date:         date,
+  })
 
-  if (insError) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-
-  if (Number(quantity) > 0) {
-    await supabase.from('transactions').insert({
-      farm_id,
-      insumo_id: insumo.id,
-      user_id: session.id,
-      type: 'entrada',
-      quantity: Number(quantity),
-      date,
-      notes: 'Estoque inicial',
-    })
+  if (error) {
+    const { status, message } = parseRpcError(error)
+    return NextResponse.json({ error: message }, { status })
   }
 
-  return NextResponse.json(insumo, { status: 201 })
+  return NextResponse.json(rpc as object, { status: 201 })
 }

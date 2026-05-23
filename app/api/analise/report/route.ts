@@ -72,10 +72,10 @@ export async function GET(req: NextRequest) {
     supabase.from('insumos').select('id, title').in('farm_id', targetFarmIds),
   ])
 
-  // 4. Fetch transactions
+  // 4. Fetch transactions — inclui users(name) via JOIN para evitar segundo round-trip
   let txQuery = supabase
     .from('transactions')
-    .select('id, insumo_id, talhao_id, user_id, quantity, area_ha, date, notes')
+    .select('id, insumo_id, talhao_id, user_id, quantity, area_ha, date, notes, users(name)')
     .in('farm_id', targetFarmIds)
     .eq('type', 'saida')
     .gte('date', from)
@@ -89,23 +89,24 @@ export async function GET(req: NextRequest) {
   const { data: txData, error: txError } = await txQuery
   if (txError) return NextResponse.json({ error: 'Erro ao consultar transações.' }, { status: 500 })
 
-  // 5. Fetch user names
-  const userIds = [...new Set((txData ?? []).map((t: { user_id: string | null }) => t.user_id).filter(Boolean))]
-  const { data: usersData } = userIds.length > 0
-    ? await supabase.from('users').select('id, name').in('id', userIds as string[])
-    : { data: [] }
+  // Build lookup maps (user names vêm inline do JOIN)
+  const talhaoMap = Object.fromEntries((talhoesData ?? []).map((t: { id: string; name: string; area_ha: number }) => [t.id, t]))
+  const insumoMap = Object.fromEntries((insumosData  ?? []).map((i: { id: string; title: string }) => [i.id, i.title]))
+  const farmName  = farmsData?.map((f: { name: string }) => f.name).join(', ') ?? 'Fazendas'
 
-  // Build lookup maps
-  const talhaoMap  = Object.fromEntries((talhoesData ?? []).map((t: { id: string; name: string; area_ha: number }) => [t.id, t]))
-  const insumoMap  = Object.fromEntries((insumosData  ?? []).map((i: { id: string; title: string }) => [i.id, i.title]))
-  const userMap    = Object.fromEntries((usersData    ?? []).map((u: { id: string; name: string }) => [u.id, u.name]))
-  const farmName   = farmsData?.map((f: { name: string }) => f.name).join(', ') ?? 'Fazendas'
-
-  const txs = (txData ?? []) as {
+  const txs = (txData ?? []) as unknown as {
     id: string; insumo_id: string; talhao_id: string | null
     user_id: string | null; quantity: number; area_ha: number | null
     date: string; notes: string | null
+    users: { name: string }[] | null
   }[]
+
+  // Helper: resolve nome do usuário a partir do JOIN embutido
+  const userMap = Object.fromEntries(
+    txs
+      .filter(t => t.user_id && t.users && t.users.length > 0)
+      .map(t => [t.user_id as string, t.users![0].name])
+  )
 
   // ─── PDF ────────────────────────────────────────────────────────────────────
   if (format === 'pdf') {

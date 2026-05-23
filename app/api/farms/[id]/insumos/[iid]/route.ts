@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
+import { parseRpcError } from '@/lib/rpcErrors'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
 
@@ -45,51 +46,37 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { title, description, min_quantity, quantity, adjustment_notes } = body
 
-  // ── Quantity adjustment: optimistic lock + audit trail ─────────────────────
+  // ── Ajuste de quantidade: RPC atômica ──────────────────────────────────────
   if (quantity !== undefined) {
-    const { data: current } = await supabase
-      .from('insumos')
-      .select('quantity')
-      .eq('id', iid)
-      .eq('farm_id', farm_id)
-      .single()
-
-    if (!current) return NextResponse.json({ error: 'Insumo não encontrado.' }, { status: 404 })
-
-    const oldQty = Number(current.quantity)
     const newQty = Number(quantity)
-
-    if (newQty < 0) return NextResponse.json({ error: 'Estoque não pode ser negativo.' }, { status: 400 })
-
-    const { data, error } = await supabase
-      .from('insumos')
-      .update({ quantity: newQty })
-      .eq('id', iid)
-      .eq('farm_id', farm_id)
-      .eq('quantity', oldQty)
-      .select()
-      .single()
-
-    if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-    if (!data) return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
-
-    const delta = newQty - oldQty
-    if (Math.abs(delta) > 0.0001) {
-      await supabase.from('transactions').insert({
-        farm_id,
-        insumo_id: iid,
-        user_id: session.id,
-        type: delta > 0 ? 'entrada' : 'saida',
-        quantity: Math.abs(delta),
-        date: new Date().toISOString().split('T')[0],
-        notes: `Ajuste manual${adjustment_notes ? ': ' + adjustment_notes : ''}`,
-      })
+    if (newQty < 0) {
+      return NextResponse.json({ error: 'Estoque não pode ser negativo.' }, { status: 400 })
     }
+
+    const { data: rpc, error } = await supabase.rpc('ajustar_estoque', {
+      p_insumo_id: iid,
+      p_farm_id:   farm_id,
+      p_user_id:   session.id,
+      p_new_qty:   newQty,
+      p_notes:     adjustment_notes || null,
+    })
+
+    if (error) {
+      const { status, message } = parseRpcError(error)
+      return NextResponse.json({ error: message }, { status })
+    }
+
+    // Retorna o insumo atualizado
+    const { data } = await supabase
+      .from('insumos')
+      .select('*')
+      .eq('id', iid)
+      .single()
 
     return NextResponse.json(data)
   }
 
-  // ── Metadata update (title, description, min_quantity) ─────────────────────
+  // ── Atualização de metadados (title, description, min_quantity) ────────────
   const updateData: Record<string, unknown> = {}
   if (title !== undefined) updateData.title = title
   if (description !== undefined) updateData.description = description || null

@@ -30,7 +30,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     .update({ owner_id: session.id })
     .eq('id', farmId)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
 
   return NextResponse.json({ ok: true })
 }

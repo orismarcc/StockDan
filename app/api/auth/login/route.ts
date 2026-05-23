@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { createServerClient } from '@/lib/supabase'
 import { createToken, COOKIE } from '@/lib/auth'
 import { checkRateLimit, recordFailure, resetAttempts } from '@/lib/rateLimiter'
+import { parseBody } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
@@ -14,7 +15,9 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { email, password } = await req.json()
+  const body = await parseBody<{ email?: string; password?: string }>(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
+  const { email, password } = body
 
   if (!email || !password) {
     return NextResponse.json({ error: 'E-mail e senha são obrigatórios.' }, { status: 400 })

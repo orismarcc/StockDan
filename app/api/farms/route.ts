@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { parseBody } from '@/lib/utils'
 
 export async function GET() {
   const session = await getActiveSession()
@@ -16,7 +17,7 @@ export async function GET() {
       .eq('owner_id', session.id)
       .order('name')
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
     return NextResponse.json(data)
   }
 
@@ -26,7 +27,7 @@ export async function GET() {
     .select('farms(*)')
     .eq('user_id', session.id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json(data.map((r: any) => r.farms))
 }
 
@@ -36,7 +37,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
-  const body = await req.json()
+  const body = await parseBody<{ name?: string; city?: string; state?: string; farmer_name?: string }>(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { name, city, state, farmer_name } = body
 
   if (!name || !city || !state || !farmer_name) {
@@ -50,6 +52,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json(data, { status: 201 })
 }

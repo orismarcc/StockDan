@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { parseBody } from '@/lib/utils'
 
 type Params = { params: Promise<{ uid: string }> }
 
@@ -53,7 +54,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (!target) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
 
-  const body = await req.json()
+  const body = await parseBody(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { name, role, password, farm_ids } = body
 
   const updates: Record<string, unknown> = {}
@@ -69,7 +71,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (Object.keys(updates).length > 0) {
     const { error } = await supabase.from('users').update(updates).eq('id', uid)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   }
 
   if (Array.isArray(farm_ids)) {
@@ -122,6 +124,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!target) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
 
   const { error } = await supabase.from('users').delete().eq('id', uid)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
+import { parseBody } from '@/lib/utils'
 
 type Params = { params: Promise<{ id: string; tid: string }> }
 
@@ -18,7 +19,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
-  const { name, area_ha } = await req.json()
+  const body = await parseBody(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
+  const { name, area_ha } = body as { name?: string; area_ha?: number }
 
   if (!name || !area_ha || Number(area_ha) <= 0) {
     return NextResponse.json({ error: 'Nome e área são obrigatórios.' }, { status: 400 })
@@ -32,7 +35,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json(data)
 }
 
@@ -55,6 +58,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .eq('id', tid)
     .eq('farm_id', farm_id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

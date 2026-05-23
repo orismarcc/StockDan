@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { parseBody } from '@/lib/utils'
 
 export async function GET() {
   const session = await getActiveSession()
@@ -16,7 +17,7 @@ export async function GET() {
     .eq('created_by', session.id)
     .order('name')
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json(data)
 }
 
@@ -26,7 +27,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
-  const body = await req.json()
+  const body = await parseBody(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { email, password, role } = body
 
   if (!email || !password || !role) {
@@ -67,6 +69,6 @@ export async function POST(req: NextRequest) {
     .select('id, name, email, role, must_change_password, created_at')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json(data, { status: 201 })
 }

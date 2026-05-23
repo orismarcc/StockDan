@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
+import { parseBody } from '@/lib/utils'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
 
@@ -12,7 +13,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const { id: farm_id, iid: insumo_id } = await params
-  const body = await req.json()
+  const body = await parseBody(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { quantity, date, notes } = body
 
   if (!quantity || Number(quantity) <= 0 || !date) {
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     .eq('quantity', Number(insumo.quantity))
     .select('quantity')
 
-  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+  if (updateErr) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   if (!updated || updated.length === 0) {
     return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
   }
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (txErr) {
     // Compensação: reverte estoque se a transação falhou ao persistir
     await supabase.from('insumos').update({ quantity: insumo.quantity }).eq('id', insumo_id)
-    return NextResponse.json({ error: txErr.message }, { status: 500 })
+    return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, transaction: tx, newQuantity: newQty }, { status: 201 })

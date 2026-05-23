@@ -29,3 +29,14 @@ export const BR_STATES = [
 export function cn(...classes: (string | undefined | false | null)[]): string {
   return classes.filter(Boolean).join(' ')
 }
+
+import type { NextRequest } from 'next/server'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function parseBody<T = Record<string, any>>(req: NextRequest): Promise<T | null> {
+  try {
+    return await req.json() as T
+  } catch {
+    return null
+  }
+}

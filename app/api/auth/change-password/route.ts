@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getSession, createToken, COOKIE } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { parseBody } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
   const session = await getSession()
@@ -9,7 +10,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
   }
 
-  const { name, password } = await req.json()
+  const body = await parseBody<{ name?: string; password?: string }>(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
+  const { name, password } = body
 
   if (!name || name.trim().length < 2) {
     return NextResponse.json({ error: 'Informe seu nome completo.' }, { status: 400 })

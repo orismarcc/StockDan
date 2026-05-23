@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
+import { parseBody } from '@/lib/utils'
 
 type Params = { params: Promise<{ id: string; tid: string }> }
 
@@ -16,7 +17,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
-  const body = await req.json()
+  const body = await parseBody(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { quantity, date, talhao_id, notes, area_ha } = body
 
   // ── Atualização de área aplicada ──────────────────────────────────────────
@@ -34,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .eq('id', tid)
       .eq('farm_id', farm_id)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
     return NextResponse.json({ ok: true })
   }
 
@@ -86,7 +88,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .eq('quantity', currentStock)
     .select('quantity')
 
-  if (stockErr) return NextResponse.json({ error: stockErr.message }, { status: 500 })
+  if (stockErr) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   if (!stockUpdated || stockUpdated.length === 0) {
     return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
   }
@@ -100,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (txErr) {
     await supabase.from('insumos').update({ quantity: currentStock }).eq('id', tx.insumo_id)
-    return NextResponse.json({ error: txErr.message }, { status: 500 })
+    return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, transaction: updated })
@@ -151,7 +153,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .eq('quantity', currentStock)
     .select('quantity')
 
-  if (stockErr) return NextResponse.json({ error: stockErr.message }, { status: 500 })
+  if (stockErr) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   if (!stockUpdated || stockUpdated.length === 0) {
     return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
   }
@@ -160,7 +162,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   if (delErr) {
     await supabase.from('insumos').update({ quantity: currentStock }).eq('id', tx.insumo_id)
-    return NextResponse.json({ error: delErr.message }, { status: 500 })
+    return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })

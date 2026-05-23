@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
+import { trimField, isValidQuantity, withinLength } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
 
@@ -49,8 +50,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   // ── Ajuste de quantidade: RPC atômica ──────────────────────────────────────
   if (quantity !== undefined) {
     const newQty = Number(quantity)
-    if (newQty < 0) {
-      return NextResponse.json({ error: 'Estoque não pode ser negativo.' }, { status: 400 })
+    if (!Number.isFinite(newQty) || newQty < 0 || newQty > 9_999_999) {
+      return NextResponse.json({ error: 'Estoque inválido (deve ser ≥ 0 e ≤ 9.999.999).' }, { status: 400 })
     }
 
     const { data: rpc, error } = await supabase.rpc('ajustar_estoque', {
@@ -78,9 +79,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   // ── Atualização de metadados (title, description, min_quantity) ────────────
   const updateData: Record<string, unknown> = {}
-  if (title !== undefined) updateData.title = title
-  if (description !== undefined) updateData.description = description || null
-  if (min_quantity !== undefined) updateData.min_quantity = min_quantity != null ? Number(min_quantity) : null
+  if (title !== undefined) {
+    const t = trimField(title)
+    if (!t) return NextResponse.json({ error: 'Nome do insumo não pode ser vazio.' }, { status: 400 })
+    if (!withinLength(t, 120)) return NextResponse.json({ error: 'Nome excede 120 caracteres.' }, { status: 400 })
+    updateData.title = t
+  }
+  if (description !== undefined) updateData.description = trimField(description)
+  if (min_quantity !== undefined) {
+    const mq = min_quantity != null ? Number(min_quantity) : null
+    if (mq !== null && (!Number.isFinite(mq) || mq < 0 || mq > 9_999_999)) {
+      return NextResponse.json({ error: 'Estoque mínimo inválido.' }, { status: 400 })
+    }
+    updateData.min_quantity = mq
+  }
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: 'Nenhum campo para atualizar.' }, { status: 400 })

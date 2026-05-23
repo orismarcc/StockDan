@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback, memo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn, formatQuantity } from '@/lib/utils'
@@ -37,6 +37,8 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
   const [regulagemFor, setRegulagemFor] = useState<{ id: string; name: string } | null>(null)
   const router = useRouter()
 
+  const handleRouterRefresh = useCallback(() => router.refresh(), [router])
+
   // Área acumulada por insumo por talhão
   const talhaoInsumoStats = useMemo(() => {
     const result: Record<string, Record<string, { accumArea: number; totalQtyKg: number; txCount: number }>> = {}
@@ -70,11 +72,11 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
       .map(([title]) => title)
   }, [transactions])
 
-  const tabs: { id: TabId; label: string; count?: number }[] = [
+  const tabs: { id: TabId; label: string; count?: number }[] = useMemo(() => [
     { id: 'talhoes',   label: 'Talhões',   count: talhoes.length },
     { id: 'insumos',   label: 'Insumos',   count: insumos.length },
     { id: 'historico', label: 'Histórico', count: transactions.length },
-  ]
+  ], [talhoes.length, insumos.length, transactions.length])
 
   return (
     <>
@@ -153,7 +155,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                         insumoStats={talhaoInsumoStats[t.id] ?? {}}
                         topInsumos={topInsumos}
                         userRole={userRole}
-                        onDeleted={() => router.refresh()}
+                        onDeleted={handleRouterRefresh}
                         onRegulagem={() => setRegulagemFor({ id: t.id, name: t.name })}
                       />
                     ))}
@@ -229,7 +231,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
                         userRole={userRole}
                         onAddStock={() => setAddStockFor({ id: ins.id, title: ins.title, unit: ins.unit })}
                         onEditQty={() => setEditQtyFor({ id: ins.id, title: ins.title, unit: ins.unit, currentQty: ins.quantity })}
-                        onDeleted={() => router.refresh()}
+                        onDeleted={handleRouterRefresh}
                       />
                     ))}
                   </tbody>
@@ -324,7 +326,7 @@ function pctTextColor(pct: number) {
   return pct >= 100 ? 'text-blue-400' : pct >= 75 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-orange-400'
 }
 
-function TalhaoRow({
+const TalhaoRow = memo(function TalhaoRow({
   talhao: t,
   farmId,
   insumoStats,
@@ -408,11 +410,11 @@ function TalhaoRow({
       </td>
     </tr>
   )
-}
+})
 
 // ─── TalhaoCard (mobile) ─────────────────────────────────────────────────────
 
-function TalhaoCard({
+const TalhaoCard = memo(function TalhaoCard({
   talhao: t,
   farmId,
   insumoStats,
@@ -510,11 +512,11 @@ function TalhaoCard({
       </div>
     </div>
   )
-}
+})
 
 // ─── InsumoRow (desktop) ─────────────────────────────────────────────────────
 
-function InsumoRow({
+const InsumoRow = memo(function InsumoRow({
   ins,
   farmId,
   userRole,
@@ -587,11 +589,11 @@ function InsumoRow({
       </td>
     </tr>
   )
-}
+})
 
 // ─── InsumoCard (mobile) ─────────────────────────────────────────────────────
 
-function InsumoCard({
+const InsumoCard = memo(function InsumoCard({
   ins,
   farmId,
   userRole,
@@ -664,7 +666,7 @@ function InsumoCard({
       </div>
     </div>
   )
-}
+})
 
 // ─── AdjustQuantityModal ─────────────────────────────────────────────────────
 
@@ -689,14 +691,17 @@ function AdjustQuantityModal({
   const [notes,   setNotes]   = useState('')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
+  const submittingRef = useRef(false)
 
   const unitLabel = 'kg'
   const delta = Number(newQty) - currentQty
 
   async function handleSave() {
+    if (submittingRef.current) return
     const qty = Number(newQty)
-    if (isNaN(qty) || qty < 0) { setError('Quantidade inválida.'); return }
+    if (isNaN(qty) || qty < 0 || qty > 9_999_999) { setError('Quantidade inválida (máx. 9.999.999).'); return }
     setLoading(true); setError('')
+    submittingRef.current = true
     const res = await fetch(`/api/farms/${farmId}/insumos/${insumoId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -704,6 +709,7 @@ function AdjustQuantityModal({
     })
     const data = await res.json().catch(() => ({}))
     setLoading(false)
+    submittingRef.current = false
     if (!res.ok) { setError(data.error ?? 'Falha ao salvar.'); return }
     onSuccess()
   }
@@ -749,6 +755,7 @@ function AdjustQuantityModal({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Ex: correção de inventário, perda, devolução..."
+            maxLength={1000}
             className="w-full rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-green-500/60 focus:outline-none"
           />
           <p className="mt-1 text-xs text-gray-600">Registrado no histórico de movimentações.</p>

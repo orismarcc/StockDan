@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
+import { isValidDate, isValidQuantity, isUUID, withinLength, trimField } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -43,7 +44,10 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { data, error, count } = await query
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
 
-  const headers = new Headers({ 'X-Total-Count': String(count ?? 0) })
+  const headers = new Headers({
+    'X-Total-Count': String(count ?? 0),
+    'Cache-Control': 'private, max-age=15, stale-while-revalidate=30',
+  })
   return NextResponse.json(data, { headers })
 }
 
@@ -60,25 +64,58 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
-  const { insumo_id, talhao_id, quantity, date, notes, area_ha } = body
+  const { insumo_id, talhao_id, quantity, date, area_ha } = body
+  const notes      = trimField(body.notes)       // strip leading/trailing whitespace
+  const offline_id = body.offline_id ?? null
+
+  // Validate offline_id format to prevent crafted idempotency keys
+  if (offline_id !== null && !isUUID(offline_id)) {
+    return NextResponse.json({ error: 'offline_id inválido.' }, { status: 400 })
+  }
+
+  // [OFFLINE-1] Idempotency: se offline_id já foi processado, retorna a transação existente
+  if (offline_id) {
+    const { data: existing } = await supabase
+      .from('transactions')
+      .select('*, insumos(title, unit), talhoes(id, name), users(name)')
+      .eq('offline_id', offline_id)
+      .eq('farm_id', farm_id)
+      .maybeSingle()
+
+    if (existing) {
+      const { data: currentInsumo } = await supabase
+        .from('insumos').select('quantity').eq('id', existing.insumo_id).single()
+      return NextResponse.json(
+        { ok: true, transaction: existing, newQuantity: currentInsumo?.quantity ?? 0 },
+        { status: 201 }
+      )
+    }
+  }
 
   if (!insumo_id || !talhao_id || !quantity || !date) {
     return NextResponse.json({ error: 'Insumo, talhão, quantidade e data são obrigatórios.' }, { status: 400 })
   }
-  if (Number(quantity) <= 0) {
-    return NextResponse.json({ error: 'Quantidade deve ser maior que zero.' }, { status: 400 })
+  if (!isValidQuantity(quantity)) {
+    return NextResponse.json({ error: 'Quantidade inválida (deve ser > 0 e ≤ 9.999.999).' }, { status: 400 })
+  }
+  if (!isValidDate(date)) {
+    return NextResponse.json({ error: 'Data inválida. Use o formato AAAA-MM-DD.' }, { status: 400 })
+  }
+  if (notes && !withinLength(notes, 1000)) {
+    return NextResponse.json({ error: 'Observação excede 1.000 caracteres.' }, { status: 400 })
   }
 
   // RPC atômica: UPDATE insumos + INSERT transactions em uma transação PostgreSQL
   const { data: rpc, error } = await supabase.rpc('registrar_saida', {
-    p_farm_id:   farm_id,
-    p_insumo_id: insumo_id,
-    p_talhao_id: talhao_id,
-    p_user_id:   session.id,
-    p_quantity:  Number(quantity),
-    p_date:      date,
-    p_notes:     notes || null,
-    p_area_ha:   area_ha != null && Number(area_ha) > 0 ? Number(area_ha) : null,
+    p_farm_id:    farm_id,
+    p_insumo_id:  insumo_id,
+    p_talhao_id:  talhao_id,
+    p_user_id:    session.id,
+    p_quantity:   Number(quantity),
+    p_date:       date,
+    p_notes:      notes || null,
+    p_area_ha:    area_ha != null && Number(area_ha) > 0 ? Number(area_ha) : null,
+    p_offline_id: (offline_id && typeof offline_id === 'string') ? offline_id : null,
   })
 
   if (error) {

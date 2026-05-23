@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
+import { isValidDate, isValidQuantity, isValidAreaHa, withinLength, trimField } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string; tid: string }> }
 
@@ -20,14 +21,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
-  const { quantity, date, talhao_id, notes, area_ha } = body
+  const { quantity, date, talhao_id, area_ha } = body
+  const notes = trimField(body.notes)
 
   // ── Atualização de área aplicada (qualquer usuário com acesso à fazenda) ────
   // Não toca no estoque — sem necessidade de RPC.
   if (area_ha !== undefined && quantity === undefined && date === undefined) {
-    const ha = Number(area_ha)
-    if (isNaN(ha) || ha <= 0) {
-      return NextResponse.json({ error: 'Área deve ser maior que zero.' }, { status: 400 })
+    if (!isValidAreaHa(area_ha)) {
+      return NextResponse.json({ error: 'Área deve ser maior que zero (máx. 9.999.999 ha).' }, { status: 400 })
     }
 
     const { error } = await supabase
@@ -45,8 +46,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
-  if (!quantity || Number(quantity) <= 0 || !date) {
+  if (!quantity || !date) {
     return NextResponse.json({ error: 'Quantidade e data são obrigatórios.' }, { status: 400 })
+  }
+  if (!isValidQuantity(quantity)) {
+    return NextResponse.json({ error: 'Quantidade inválida (deve ser > 0 e ≤ 9.999.999).' }, { status: 400 })
+  }
+  if (!isValidDate(date)) {
+    return NextResponse.json({ error: 'Data inválida. Use o formato AAAA-MM-DD.' }, { status: 400 })
+  }
+  if (notes && !withinLength(notes, 1000)) {
+    return NextResponse.json({ error: 'Observação excede 1.000 caracteres.' }, { status: 400 })
   }
 
   // RPC atômica: ajusta estoque + atualiza transaction em uma transação PostgreSQL

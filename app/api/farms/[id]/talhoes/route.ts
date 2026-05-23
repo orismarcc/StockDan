@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
+import { trimField, isValidAreaHa, withinLength } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -24,7 +25,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .order('name')
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-  return NextResponse.json(data)
+  return NextResponse.json(data, {
+    headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+  })
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
@@ -42,15 +45,18 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
-  const { name, area_ha } = body
 
-  if (!name || !area_ha || Number(area_ha) <= 0) {
-    return NextResponse.json({ error: 'Nome e área são obrigatórios.' }, { status: 400 })
+  const name = trimField(body.name)
+  if (!name) return NextResponse.json({ error: 'Nome é obrigatório.' }, { status: 400 })
+  if (!withinLength(name, 120)) return NextResponse.json({ error: 'Nome excede 120 caracteres.' }, { status: 400 })
+  if (!isValidAreaHa(body.area_ha)) {
+    return NextResponse.json({ error: 'Área deve ser maior que zero (máx. 9.999.999 ha).' }, { status: 400 })
   }
+  const area_ha = Number(body.area_ha)
 
   const { data, error } = await supabase
     .from('talhoes')
-    .insert({ farm_id, name, area_ha: Number(area_ha) })
+    .insert({ farm_id, name, area_ha })
     .select()
     .single()
 

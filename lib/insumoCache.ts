@@ -1,4 +1,5 @@
 const CACHE_KEY = 'stockdan_insumo_cache'
+const CACHE_TTL_MS = 4 * 60 * 60 * 1000 // 4 horas
 
 export interface CachedInsumo {
   id: string
@@ -22,7 +23,14 @@ function read(): Record<string, FarmCache> {
 }
 
 function write(data: Record<string, FarmCache>) {
-  localStorage.setItem(CACHE_KEY, JSON.stringify(data))
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data))
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      throw new Error('STORAGE_FULL')
+    }
+    throw e
+  }
 }
 
 export const insumoCache = {
@@ -33,7 +41,17 @@ export const insumoCache = {
   },
 
   getFarm(farmId: string): CachedInsumo[] {
-    return read()[farmId]?.insumos ?? []
+    const entry = read()[farmId]
+    if (!entry) return []
+    const age = Date.now() - new Date(entry.lastUpdated).getTime()
+    if (age > CACHE_TTL_MS) return [] // expirado — forçar busca no servidor
+    return entry.insumos
+  },
+
+  isStale(farmId: string): boolean {
+    const entry = read()[farmId]
+    if (!entry) return true
+    return Date.now() - new Date(entry.lastUpdated).getTime() > CACHE_TTL_MS
   },
 
   decreaseQuantity(farmId: string, insumoId: string, amount: number) {

@@ -23,6 +23,7 @@ interface TransactionTableProps {
   talhoes?: { id: string; name: string; area_ha: number }[]
   onEdit?: (tx: Transaction) => void
   onDelete?: (txId: string) => void
+  pageSize?: number
 }
 
 export function TransactionTable({
@@ -32,12 +33,16 @@ export function TransactionTable({
   userRole,
   onEdit,
   onDelete,
+  pageSize = 50,
 }: TransactionTableProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState('')
+  const [page, setPage] = useState(0)
 
   const canEdit = userRole === 'admin' && farmId && (onEdit || onDelete)
+  const totalPages = Math.ceil(transactions.length / pageSize)
+  const paginated = transactions.slice(page * pageSize, (page + 1) * pageSize)
 
   async function handleDelete(txId: string) {
     if (!farmId) return
@@ -90,16 +95,16 @@ export function TransactionTable({
             </tr>
           </thead>
           <tbody>
-            {transactions.map((tx) => (
+            {paginated.map((tx) => (
               <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
                 <td className="py-3 pr-4 whitespace-nowrap">
-                <span className="text-gray-400">{formatDate(tx.date)}</span>
-                {tx.created_at && (
-                  <span className="block text-[11px] text-gray-600">
-                    reg. {formatTime(tx.created_at)}
-                  </span>
-                )}
-              </td>
+                  <span className="text-gray-400">{formatDate(tx.date)}</span>
+                  {tx.created_at && (
+                    <span className="block text-[11px] text-gray-600">
+                      reg. {formatTime(tx.created_at)}
+                    </span>
+                  )}
+                </td>
                 <td className="py-3 pr-4">
                   {tx.type === 'entrada' ? (
                     <span className="inline-flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 whitespace-nowrap">
@@ -169,6 +174,51 @@ export function TransactionTable({
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-4">
+          <p className="text-xs text-gray-600">
+            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, transactions.length)} de {transactions.length} registros
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(0)}
+              disabled={page === 0}
+              className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
+              aria-label="Primeira página"
+            >
+              «
+            </button>
+            <button
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page === 0}
+              className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
+              aria-label="Página anterior"
+            >
+              ‹
+            </button>
+            <span className="px-2 text-xs text-gray-500">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= totalPages - 1}
+              className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
+              aria-label="Próxima página"
+            >
+              ›
+            </button>
+            <button
+              onClick={() => setPage(totalPages - 1)}
+              disabled={page >= totalPages - 1}
+              className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
+              aria-label="Última página"
+            >
+              »
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

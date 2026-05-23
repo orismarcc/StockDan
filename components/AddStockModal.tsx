@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Modal } from './ui/Modal'
 import { Input } from './ui/Input'
 import { Textarea } from './ui/Textarea'
@@ -22,25 +22,30 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
   const [notes, setNotes]       = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  const submittingRef           = useRef(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submittingRef.current) return
     setError('')
 
-    if (!quantity || Number(quantity) <= 0) {
-      setError('Informe uma quantidade válida.')
+    const qty = Number(quantity)
+    if (!quantity || qty <= 0 || qty > 9_999_999) {
+      setError('Informe uma quantidade válida (máx. 9.999.999).')
       return
     }
 
     setLoading(true)
+    submittingRef.current = true
     const res = await fetch(`/api/farms/${farmId}/insumos/${insumoId}/stock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: Number(quantity), date, notes }),
+      body: JSON.stringify({ quantity: qty, date, notes }),
     })
 
     const data = await res.json()
     setLoading(false)
+    submittingRef.current = false
 
     if (!res.ok) { setError(data.error); return }
     onSuccess()
@@ -53,6 +58,7 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
           label="Quantidade (kg) *"
           type="number"
           min="0.001"
+          max="9999999"
           step="0.001"
           placeholder="0"
           value={quantity}
@@ -72,6 +78,7 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
           placeholder="Nota fiscal, lote, fornecedor..."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          maxLength={1000}
         />
 
         {error && (

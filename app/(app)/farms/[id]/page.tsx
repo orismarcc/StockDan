@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth'
@@ -6,14 +7,19 @@ import { checkFarmAccess } from '@/lib/farmAccess'
 import { FarmTabs } from '@/components/FarmTabs'
 import { DeleteFarmButton } from '@/components/DeleteFarmButton'
 
+// Deduplica a query de farm entre generateMetadata e FarmPage no mesmo request
+const getFarm = cache(async (id: string) => {
+  const supabase = createServerClient()
+  const { data } = await supabase.from('farms').select('*').eq('id', id).single()
+  return data
+})
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session) return { title: 'Fazenda' }
   const { id } = await params
-  const supabase = createServerClient()
-  if (!(await checkFarmAccess(supabase, session, id))) return { title: 'Fazenda' }
-  const { data } = await supabase.from('farms').select('name').eq('id', id).single()
-  return { title: data?.name ?? 'Fazenda' }
+  const farm = await getFarm(id)
+  return { title: farm?.name ?? 'Fazenda' }
 }
 
 export default async function FarmPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +31,7 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
 
   if (!(await checkFarmAccess(supabase, session, id))) redirect('/dashboard')
 
-  const { data: farm } = await supabase.from('farms').select('*').eq('id', id).single()
+  const farm = await getFarm(id)
   if (!farm) notFound()
 
   const [{ data: insumos }, { data: talhoes }, { data: transactions }] = await Promise.all([

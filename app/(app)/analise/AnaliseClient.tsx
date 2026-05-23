@@ -4,6 +4,11 @@
 import { useState, useMemo } from 'react'
 import { AnaliseFilters, type FilterState } from './AnaliseFilters'
 import type { AnaliseData, TxRow } from './types'
+import { KpiCards } from './KpiCards'
+import { BarInsumo } from './charts/BarInsumo'
+import { AreaTempo } from './charts/AreaTempo'
+import { DonutTalhao } from './charts/DonutTalhao'
+import { BarKgHa } from './charts/BarKgHa'
 
 function todayISO() { return new Date().toISOString().split('T')[0] }
 function startOfMonthISO() {
@@ -82,18 +87,13 @@ export function AnaliseClient({ data }: { data: AnaliseData }) {
 
         {/* Conteúdo principal */}
         <div className="flex-1 min-w-0 flex flex-col gap-6">
-          {/* KPI cards placeholder — Task 4 */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-            <p className="text-sm text-gray-500">{filtered.length} transações no período</p>
-          </div>
+          <KpiCards transactions={filtered} />
 
-          {/* Charts grid placeholder — Tasks 5-8 */}
           <div className="grid gap-4 sm:grid-cols-2">
-            {[1,2,3,4].map((n) => (
-              <div key={n} className="rounded-xl border border-gray-800 bg-gray-900 p-5 h-48 flex items-center justify-center">
-                <p className="text-xs text-gray-700">Chart {n}</p>
-              </div>
-            ))}
+            <BarInsumo transactions={filtered} insumos={data.insumos} />
+            <AreaTempo transactions={filtered} />
+            <DonutTalhao transactions={filtered} talhoes={data.talhoes} />
+            <BarKgHa transactions={filtered} talhoes={data.talhoes} />
           </div>
 
           {/* Operadores placeholder — Task 10 */}

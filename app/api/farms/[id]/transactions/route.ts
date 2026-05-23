@@ -84,13 +84,22 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const newQty = Number(insumo.quantity) - Number(quantity)
 
-  // Atualiza estoque
-  const { error: updateErr } = await supabase
+  // Atualiza estoque com optimistic lock: só atualiza se quantity não mudou desde a leitura
+  const { data: updated, error: updateErr } = await supabase
     .from('insumos')
     .update({ quantity: newQty })
     .eq('id', insumo_id)
+    .eq('quantity', Number(insumo.quantity))
+    .select('quantity')
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+
+  if (!updated || updated.length === 0) {
+    return NextResponse.json(
+      { error: 'Estoque modificado simultaneamente. Tente novamente.' },
+      { status: 422 }
+    )
+  }
 
   // Registra transação
   const { data: tx, error: txErr } = await supabase

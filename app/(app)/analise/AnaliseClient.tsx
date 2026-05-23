@@ -9,6 +9,8 @@ import { BarInsumo } from './charts/BarInsumo'
 import { AreaTempo } from './charts/AreaTempo'
 import { DonutTalhao } from './charts/DonutTalhao'
 import { BarKgHa } from './charts/BarKgHa'
+import { OperadoresSection } from './OperadoresSection'
+import { ReportModal } from './ReportModal'
 
 function todayISO() { return new Date().toISOString().split('T')[0] }
 function startOfMonthISO() {
@@ -96,21 +98,22 @@ export function AnaliseClient({ data }: { data: AnaliseData }) {
             <BarKgHa transactions={filtered} talhoes={data.talhoes} />
           </div>
 
-          {/* Operadores placeholder — Task 10 */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-            <p className="text-xs text-gray-700">Operadores</p>
-          </div>
+          <OperadoresSection
+            transactions={filtered}
+            operators={data.operators}
+            insumos={data.insumos}
+            currentUserRole={data.currentUserRole}
+          />
         </div>
       </div>
 
-      {/* Report modal placeholder — Task 11 */}
-      {reportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setReportOpen(false)}>
-          <div className="rounded-xl bg-gray-900 border border-gray-700 p-6" onClick={(e) => e.stopPropagation()}>
-            <p className="text-gray-300">Modal de relatório — em construção</p>
-          </div>
-        </div>
-      )}
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        filters={filters}
+        farms={data.farms}
+        talhoes={data.talhoes}
+      />
     </div>
   )
 }

@@ -31,7 +31,8 @@ export default async function RetiradaPage({
       .eq('farm_id', id)
       .eq('type', 'saida')
       .order('date', { ascending: false })
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(2000),
   ])
 
   if (!farm) notFound()

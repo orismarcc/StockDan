@@ -33,6 +33,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const { id: farm_id } = await params
+  const supabase = createServerClient()
+
+  if (!(await checkFarmAccess(supabase, session, farm_id))) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+
   const body = await req.json()
   const { title, description, unit, quantity, min_quantity, date } = body
 
@@ -43,7 +49,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Unidade inválida. Use kg.' }, { status: 400 })
   }
 
-  const supabase = createServerClient()
   const { data: insumo, error: insError } = await supabase
     .from('insumos')
     .insert({

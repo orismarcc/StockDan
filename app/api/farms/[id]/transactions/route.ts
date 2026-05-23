@@ -64,6 +64,17 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (!insumo) return NextResponse.json({ error: 'Insumo não encontrado.' }, { status: 404 })
   if (insumo.farm_id !== farm_id) return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+
+  // Valida que o talhão pertence à fazenda
+  const { data: talhao } = await supabase
+    .from('talhoes')
+    .select('id')
+    .eq('id', talhao_id)
+    .eq('farm_id', farm_id)
+    .single()
+
+  if (!talhao) return NextResponse.json({ error: 'Talhão não encontrado nesta fazenda.' }, { status: 404 })
+
   if (Number(insumo.quantity) < Number(quantity)) {
     return NextResponse.json(
       { error: `Estoque insuficiente. Disponível: ${insumo.quantity}` },

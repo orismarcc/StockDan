@@ -33,6 +33,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const { id: farm_id } = await params
+  const supabase = createServerClient()
+
+  if (!(await checkFarmAccess(supabase, session, farm_id))) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+
   const body = await req.json()
   const { name, area_ha } = body
 
@@ -40,7 +46,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Nome e área são obrigatórios.' }, { status: 400 })
   }
 
-  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('talhoes')
     .insert({ farm_id, name, area_ha: Number(area_ha) })

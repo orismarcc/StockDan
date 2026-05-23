@@ -5,22 +5,29 @@ import { useRouter } from 'next/navigation'
 import { offlineQueue } from '@/lib/offlineQueue'
 import { useOnlineStatus } from './useOnlineStatus'
 
+export interface SyncResult {
+  synced: number
+  rejected: { item: import('@/lib/offlineQueue').QueueItem; reason: string }[]
+}
+
 export function useSyncQueue() {
   const isOnline = useOnlineStatus()
   const router   = useRouter()
-  const [syncing,      setSyncing]      = useState(false)
-  const [pendingCount, setPendingCount] = useState(0)
+  const [syncing,        setSyncing]        = useState(false)
+  const [pendingCount,   setPendingCount]   = useState(0)
+  const [rejectedItems,  setRejectedItems]  = useState<SyncResult['rejected']>([])
 
   useEffect(() => {
     setPendingCount(offlineQueue.count())
   }, [])
 
-  const sync = useCallback(async () => {
+  const sync = useCallback(async (): Promise<SyncResult> => {
     const items = offlineQueue.getAll()
-    if (items.length === 0) return
+    if (items.length === 0) return { synced: 0, rejected: [] }
 
     setSyncing(true)
     let synced = 0
+    const rejected: SyncResult['rejected'] = []
 
     for (const item of items) {
       try {
@@ -33,13 +40,18 @@ export function useSyncQueue() {
             quantity:  item.quantity,
             date:      item.date,
             notes:     item.notes,
+            area_ha:   item.area_ha,
           }),
         })
 
-        // Sucesso ou 422 (estoque insuficiente — item já foi processado ou inválido)
-        if (res.ok || res.status === 422) {
+        if (res.ok) {
           offlineQueue.remove(item.id)
           synced++
+        } else if (res.status === 422) {
+          // Estoque insuficiente no servidor: remove da fila e registra como rejeitado
+          const body = await res.json().catch(() => ({}))
+          offlineQueue.remove(item.id)
+          rejected.push({ item, reason: body.error ?? 'Estoque insuficiente no servidor.' })
         } else {
           offlineQueue.incrementRetry(item.id)
         }
@@ -50,7 +62,9 @@ export function useSyncQueue() {
 
     setSyncing(false)
     setPendingCount(offlineQueue.count())
+    setRejectedItems(rejected)
     if (synced > 0) router.refresh()
+    return { synced, rejected }
   }, [router])
 
   useEffect(() => {
@@ -59,5 +73,7 @@ export function useSyncQueue() {
     }
   }, [isOnline, sync])
 
-  return { isOnline, syncing, pendingCount, sync }
+  const clearRejected = useCallback(() => setRejectedItems([]), [])
+
+  return { isOnline, syncing, pendingCount, rejectedItems, clearRejected, sync }
 }

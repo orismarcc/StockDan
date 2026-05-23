@@ -23,6 +23,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_transactions_offline_id
   WHERE offline_id IS NOT NULL;
 
 -- 3. Atualiza registrar_saida para aceitar e persistir offline_id
+-- DROP explícito necessário porque a nova assinatura (9 params) difere da anterior (8 params)
+-- e CREATE OR REPLACE só substitui funções com a mesma assinatura exata.
+DROP FUNCTION IF EXISTS registrar_saida(UUID, UUID, UUID, UUID, NUMERIC, DATE, TEXT, NUMERIC);
+
 CREATE OR REPLACE FUNCTION registrar_saida(
   p_farm_id    UUID,
   p_insumo_id  UUID,

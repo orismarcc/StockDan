@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { checkFarmAccess } from '@/lib/farmAccess'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
 
@@ -20,19 +21,19 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const supabase = createServerClient()
 
+  if (!(await checkFarmAccess(supabase, session, farm_id))) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+
   const { data: insumo, error: fetchErr } = await supabase
     .from('insumos')
     .select('quantity, farm_id')
     .eq('id', insumo_id)
+    .eq('farm_id', farm_id)
     .single()
 
   if (fetchErr || !insumo) {
     return NextResponse.json({ error: 'Insumo não encontrado.' }, { status: 404 })
-  }
-
-  // Garante que o insumo pertence à fazenda do parâmetro da rota
-  if (insumo.farm_id !== farm_id) {
-    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
   const newQty = Number(insumo.quantity) + Number(quantity)

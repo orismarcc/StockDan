@@ -73,10 +73,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   if (Array.isArray(farm_ids)) {
-    await supabase.from('farm_users').delete().eq('user_id', uid)
+    // Valida que todas as fazendas pertencem ao admin solicitante
+    let allowedFarmIds: string[] = []
     if (farm_ids.length > 0) {
+      const { data: ownedFarms } = await supabase
+        .from('farms')
+        .select('id')
+        .eq('owner_id', session.id)
+        .in('id', farm_ids)
+      allowedFarmIds = (ownedFarms ?? []).map((f: { id: string }) => f.id)
+    }
+
+    await supabase.from('farm_users').delete().eq('user_id', uid)
+    if (allowedFarmIds.length > 0) {
       await supabase.from('farm_users').insert(
-        farm_ids.map((fid: string) => ({ user_id: uid, farm_id: fid }))
+        allowedFarmIds.map((fid) => ({ user_id: uid, farm_id: fid }))
       )
     }
   }

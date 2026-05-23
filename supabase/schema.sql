@@ -2,7 +2,7 @@
 -- StockDan — Schema PostgreSQL para Supabase
 -- Este arquivo é a fonte de verdade do schema atual.
 -- Para ambientes novos: aplique as migrations em ordem.
--- Última atualização: 2026-05-23 (migrations 001–008)
+-- Última atualização: 2026-05-23 (migrations 001–009)
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -102,13 +102,15 @@ CREATE TABLE IF NOT EXISTS transactions (
   date       DATE           NOT NULL,
   notes      TEXT,
   area_ha    NUMERIC(10, 4),
+  offline_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 COMMENT ON TABLE  transactions IS 'Histórico completo de movimentações de estoque.';
-COMMENT ON COLUMN transactions.talhao_id IS 'NULL para entradas ou quando o talhão foi excluído (histórico preservado).';
-COMMENT ON COLUMN transactions.date      IS 'Data informada pelo usuário (pode diferir de created_at).';
-COMMENT ON COLUMN transactions.area_ha   IS 'Área trabalhada em hectares (saídas). Opcional.';
+COMMENT ON COLUMN transactions.talhao_id  IS 'NULL para entradas ou quando o talhão foi excluído (histórico preservado).';
+COMMENT ON COLUMN transactions.date       IS 'Data informada pelo usuário (pode diferir de created_at).';
+COMMENT ON COLUMN transactions.area_ha    IS 'Área trabalhada em hectares (saídas). Opcional.';
+COMMENT ON COLUMN transactions.offline_id IS 'Chave de idempotência para operações offline. NULL = operação online.';
 
 -- ------------------------------------------------------------
 -- Regulagem de Implementos
@@ -154,6 +156,10 @@ CREATE INDEX IF NOT EXISTS idx_impl_adj_farm            ON implement_adjustments
 CREATE INDEX IF NOT EXISTS idx_impl_adj_talhao          ON implement_adjustments (talhao_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_farm_date_type
   ON transactions (farm_id, date DESC, type);
+
+-- Idempotência offline (migration 20260523000009)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_transactions_offline_id
+  ON transactions (offline_id) WHERE offline_id IS NOT NULL;
 
 -- ------------------------------------------------------------
 -- View de diagnóstico de integridade de estoque

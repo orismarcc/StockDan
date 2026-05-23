@@ -23,7 +23,14 @@ function read(): QueueItem[] {
 }
 
 function write(items: QueueItem[]) {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(items))
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(items))
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      throw new Error('STORAGE_FULL')
+    }
+    throw e
+  }
 }
 
 const MAX_RETRIES = 5

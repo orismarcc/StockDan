@@ -2,8 +2,13 @@ const CACHE = 'stockdan-v2'
 const PRECACHE = ['/offline.html']
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting()
+  // Não chama skipWaiting() aqui — aguarda o usuário confirmar a atualização
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE).catch(() => {})))
+})
+
+// [SW-1] Permite que a página acione a atualização manualmente
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {

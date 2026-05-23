@@ -60,7 +60,25 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
-  const { insumo_id, talhao_id, quantity, date, notes, area_ha } = body
+  const { insumo_id, talhao_id, quantity, date, notes, area_ha, offline_id } = body
+
+  // [OFFLINE-1] Idempotency: se offline_id já foi processado, retorna a transação existente
+  if (offline_id && typeof offline_id === 'string') {
+    const { data: existing } = await supabase
+      .from('transactions')
+      .select('*, insumos(title, unit), talhoes(id, name), users(name)')
+      .eq('offline_id', offline_id)
+      .maybeSingle()
+
+    if (existing) {
+      const { data: currentInsumo } = await supabase
+        .from('insumos').select('quantity').eq('id', existing.insumo_id).single()
+      return NextResponse.json(
+        { ok: true, transaction: existing, newQuantity: currentInsumo?.quantity ?? 0 },
+        { status: 201 }
+      )
+    }
+  }
 
   if (!insumo_id || !talhao_id || !quantity || !date) {
     return NextResponse.json({ error: 'Insumo, talhão, quantidade e data são obrigatórios.' }, { status: 400 })
@@ -71,14 +89,15 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // RPC atômica: UPDATE insumos + INSERT transactions em uma transação PostgreSQL
   const { data: rpc, error } = await supabase.rpc('registrar_saida', {
-    p_farm_id:   farm_id,
-    p_insumo_id: insumo_id,
-    p_talhao_id: talhao_id,
-    p_user_id:   session.id,
-    p_quantity:  Number(quantity),
-    p_date:      date,
-    p_notes:     notes || null,
-    p_area_ha:   area_ha != null && Number(area_ha) > 0 ? Number(area_ha) : null,
+    p_farm_id:    farm_id,
+    p_insumo_id:  insumo_id,
+    p_talhao_id:  talhao_id,
+    p_user_id:    session.id,
+    p_quantity:   Number(quantity),
+    p_date:       date,
+    p_notes:      notes || null,
+    p_area_ha:    area_ha != null && Number(area_ha) > 0 ? Number(area_ha) : null,
+    p_offline_id: (offline_id && typeof offline_id === 'string') ? offline_id : null,
   })
 
   if (error) {

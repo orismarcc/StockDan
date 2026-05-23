@@ -102,14 +102,23 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
 
     if (!isOnline) {
       // Modo offline: enfileira e atualiza cache local
-      offlineQueue.add({ farm_id: farmId, insumo_id: insumoId, talhao_id: talhaoId, quantity: qty, date, notes: notes || null, area_ha: areaPayload })
-      insumoCache.decreaseQuantity(farmId, insumoId, qty)
-      setLocalQtys((prev) => ({ ...prev, [insumoId]: Math.max(0, (prev[insumoId] ?? 0) - qty) }))
-      setLoading(false)
-      setOfflineOk(true)
-      setQuantity('')
-      setAreaHa('')
-      setNotes('')
+      try {
+        offlineQueue.add({ farm_id: farmId, insumo_id: insumoId, talhao_id: talhaoId, quantity: qty, date, notes: notes || null, area_ha: areaPayload })
+        insumoCache.decreaseQuantity(farmId, insumoId, qty)
+        setLocalQtys((prev) => ({ ...prev, [insumoId]: Math.max(0, (prev[insumoId] ?? 0) - qty) }))
+        setLoading(false)
+        setOfflineOk(true)
+        setQuantity('')
+        setAreaHa('')
+        setNotes('')
+      } catch (e) {
+        setLoading(false)
+        if (e instanceof Error && e.message === 'STORAGE_FULL') {
+          setError('Armazenamento local cheio. Conecte-se à internet ou libere espaço no dispositivo.')
+        } else {
+          setError('Falha ao salvar localmente. Tente novamente.')
+        }
+      }
       return
     }
 
@@ -149,12 +158,22 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900 p-6">
       {!isOnline && (
-        <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
-          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="1" y1="1" x2="23" y2="23" />
-            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
-          </svg>
-          <span>Sem conexão — a retirada será salva localmente e sincronizada ao reconectar.</span>
+        <div className="mb-5 flex flex-col gap-2">
+          <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="1" y1="1" x2="23" y2="23" />
+              <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
+            </svg>
+            <span>Sem conexão — a retirada será salva localmente e sincronizada ao reconectar.</span>
+          </div>
+          {insumoCache.isStale(farmId) && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+              <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              <span>Dados de estoque desatualizados (mais de 4h). Os valores exibidos podem não ser precisos.</span>
+            </div>
+          )}
         </div>
       )}
 

@@ -49,20 +49,22 @@ export function ConfirmDeleteButton({ onConfirm, className, iconSize = 'sm' }: P
 
   if (step === 'confirm') {
     return (
-      <span className="inline-flex items-center gap-1">
-        <span className="text-[11px] text-red-400 whitespace-nowrap">Confirmar?</span>
-        <button
-          onClick={handleConfirm}
-          className="rounded border border-red-500/40 bg-red-500/15 px-2 py-1 text-[11px] font-semibold text-red-400 hover:bg-red-500/25 transition-colors"
-        >
-          Sim
-        </button>
-        <button
-          onClick={() => setStep('idle')}
-          className="rounded border border-gray-700 bg-gray-800/60 px-2 py-1 text-[11px] text-gray-400 hover:text-gray-200 transition-colors"
-        >
-          Não
-        </button>
+      <span className="inline-flex flex-col items-end gap-1">
+        <span className="text-xs text-red-400 whitespace-nowrap">Confirmar exclusão?</span>
+        <span className="inline-flex items-center gap-1.5">
+          <button
+            onClick={handleConfirm}
+            className="min-h-[36px] rounded-lg border border-red-500/40 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-red-400 hover:bg-red-500/25 transition-colors"
+          >
+            Sim
+          </button>
+          <button
+            onClick={() => setStep('idle')}
+            className="min-h-[36px] rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            Não
+          </button>
+        </span>
       </span>
     )
   }

@@ -16,7 +16,6 @@ export function AppShell({ role, userName, children }: AppShellProps) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-950">
-      <ConnectionStatus />
       <PWAInstallPrompt />
 
       {/* Mobile backdrop */}
@@ -35,6 +34,7 @@ export function AppShell({ role, userName, children }: AppShellProps) {
       />
 
       <main className="flex flex-1 flex-col overflow-hidden">
+        <ConnectionStatus />
         {/* Mobile top bar */}
         <div className="flex items-center gap-3 border-b border-gray-800 bg-gray-950 px-4 py-3 lg:hidden">
           <button

@@ -18,7 +18,11 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', handler)
+      document.body.style.overflow = ''
+    }
   }, [open, onClose])
 
   if (!open) return null
@@ -33,7 +37,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
       {/* Panel */}
       <div
         className={cn(
-          'relative z-10 w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 shadow-2xl fade-in',
+          'relative z-10 w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 shadow-2xl fade-in overflow-y-auto max-h-[90dvh]',
           className
         )}
       >
@@ -41,7 +45,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
           <h2 className="text-base font-semibold text-gray-100">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
+            className="rounded-lg p-2 text-gray-500 hover:bg-gray-800 hover:text-gray-300 transition-colors"
             aria-label="Fechar"
           >
             <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

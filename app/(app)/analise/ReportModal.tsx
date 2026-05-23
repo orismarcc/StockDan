@@ -54,18 +54,22 @@ export function ReportModal({ open, onClose, filters, farms, talhoes }: Props) {
       if (!res.ok) { alert('Erro ao gerar relatório.'); return }
       const blob = await res.blob()
       const link = document.createElement('a')
+      const { from, to: toDate } = getDateRange(filters)
+      const dateStr = `${from.replace(/-/g, '')}_${toDate.replace(/-/g, '')}`
       link.href = URL.createObjectURL(blob)
-      link.download = `stockdan-relatorio.${format === 'pdf' ? 'pdf' : 'xlsx'}`
+      link.download = `relatorio_${dateStr}.${format === 'pdf' ? 'pdf' : 'xlsx'}`
       link.click()
       URL.revokeObjectURL(link.href)
       onClose()
+    } catch {
+      alert('Erro ao gerar relatório. Verifique sua conexão.')
     } finally {
       setLoading(null)
     }
   }
 
   // Preview info
-  const { from, to } = getDateRange(filters)
+  const { from: previewFrom, to: previewTo } = getDateRange(filters)
   const farmName = filters.farmId ? (farms.find((f) => f.id === filters.farmId)?.name ?? '—') : 'Todas'
   const talhaoNames = filters.talhaoIds.length === 0
     ? 'Todos'
@@ -79,7 +83,7 @@ export function ReportModal({ open, onClose, filters, farms, talhoes }: Props) {
       <div className="mb-5 rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm">
         <p className="mb-1 text-xs text-gray-500 uppercase tracking-wider">Filtros aplicados</p>
         <div className="flex flex-col gap-1 text-gray-300">
-          <span><span className="text-gray-500">Período:</span> {fmt(from)} — {fmt(to)}</span>
+          <span><span className="text-gray-500">Período:</span> {fmt(previewFrom)} — {fmt(previewTo)}</span>
           <span><span className="text-gray-500">Fazenda:</span> {farmName}</span>
           <span className="truncate"><span className="text-gray-500">Talhões:</span> {talhaoNames}</span>
         </div>

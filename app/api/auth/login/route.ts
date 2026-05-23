@@ -2,8 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { createServerClient } from '@/lib/supabase'
 import { createToken, COOKIE } from '@/lib/auth'
+import { checkRateLimit, recordFailure, resetAttempts } from '@/lib/rateLimiter'
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+  const { allowed, retryAfterSecs } = checkRateLimit(ip)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: `Muitas tentativas. Tente novamente em ${retryAfterSecs} segundos.` },
+      { status: 429 }
+    )
+  }
+
   const { email, password } = await req.json()
 
   if (!email || !password) {
@@ -18,13 +28,17 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (!user) {
+    recordFailure(ip)
     return NextResponse.json({ error: 'Credenciais inválidas.' }, { status: 401 })
   }
 
   const valid = await bcrypt.compare(password, user.password_hash)
   if (!valid) {
+    recordFailure(ip)
     return NextResponse.json({ error: 'Credenciais inválidas.' }, { status: 401 })
   }
+
+  resetAttempts(ip)
 
   const token = await createToken({
     id: user.id,

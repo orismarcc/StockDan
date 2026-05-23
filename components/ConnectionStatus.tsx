@@ -3,7 +3,30 @@
 import { useSyncQueue } from '@/hooks/useSyncQueue'
 
 export function ConnectionStatus() {
-  const { isOnline, syncing, pendingCount } = useSyncQueue()
+  const { isOnline, syncing, pendingCount, rejectedItems, clearRejected } = useSyncQueue()
+
+  if (rejectedItems.length > 0) {
+    return (
+      <div className="fixed inset-x-0 top-0 z-50 bg-red-950/95 py-3 text-sm text-red-200 backdrop-blur-sm">
+        <div className="flex items-start justify-between gap-3 px-4">
+          <div className="flex items-start gap-2">
+            <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>
+              <strong>{rejectedItems.length} retirada{rejectedItems.length !== 1 ? 's' : ''} rejeitada{rejectedItems.length !== 1 ? 's' : ''} pelo servidor</strong>
+              {' — '}{rejectedItems[0].reason}
+            </span>
+          </div>
+          <button onClick={clearRejected} className="shrink-0 text-red-400 hover:text-red-200 transition-colors" aria-label="Fechar">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (isOnline && pendingCount === 0 && !syncing) return null
 

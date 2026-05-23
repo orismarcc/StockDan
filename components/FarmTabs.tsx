@@ -685,11 +685,13 @@ function AdjustQuantityModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [newQty, setNewQty] = useState(String(currentQty))
+  const [newQty,  setNewQty]  = useState(String(currentQty))
+  const [notes,   setNotes]   = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error,   setError]   = useState('')
 
   const unitLabel = 'kg'
+  const delta = Number(newQty) - currentQty
 
   async function handleSave() {
     const qty = Number(newQty)
@@ -698,10 +700,11 @@ function AdjustQuantityModal({
     const res = await fetch(`/api/farms/${farmId}/insumos/${insumoId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: qty }),
+      body: JSON.stringify({ quantity: qty, adjustment_notes: notes || undefined }),
     })
+    const data = await res.json().catch(() => ({}))
     setLoading(false)
-    if (!res.ok) { setError('Falha ao salvar.'); return }
+    if (!res.ok) { setError(data.error ?? 'Falha ao salvar.'); return }
     onSuccess()
   }
 
@@ -729,7 +732,26 @@ function AdjustQuantityModal({
           </div>
           <p className="mt-1 text-xs text-gray-600">
             Atual: <span className="text-gray-400">{formatQuantity(currentQty, unit)}</span>
+            {!isNaN(delta) && Math.abs(delta) > 0.0001 && (
+              <span className={delta > 0 ? 'text-green-400 ml-2' : 'text-red-400 ml-2'}>
+                {delta > 0 ? `+${formatQuantity(delta, unit)}` : `−${formatQuantity(Math.abs(delta), unit)}`}
+              </span>
+            )}
           </p>
+        </div>
+
+        <div className="mb-4">
+          <label className="mb-1.5 block text-sm font-medium text-gray-400">
+            Motivo do ajuste <span className="text-gray-600 font-normal">(opcional)</span>
+          </label>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Ex: correção de inventário, perda, devolução..."
+            className="w-full rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-green-500/60 focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-gray-600">Registrado no histórico de movimentações.</p>
         </div>
 
         {error && <p className="mb-3 text-xs text-red-400">{error}</p>}

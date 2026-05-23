@@ -13,7 +13,6 @@ async function getFarmsWithStats(userId: string, role: string) {
   let farmsData: any[] = []
 
   if (role === 'admin') {
-    // Admins veem apenas suas próprias fazendas
     const { data } = await supabase
       .from('farms')
       .select('*')
@@ -28,36 +27,50 @@ async function getFarmsWithStats(userId: string, role: string) {
     farmsData = (data ?? []).map((r: any) => r.farms).filter(Boolean)
   }
 
-  // Para cada fazenda, busca contagem de insumos, talhões, área e status
-  const farmsWithStats = await Promise.all(
-    farmsData.map(async (farm) => {
-      const [{ data: insumos }, { data: talhaoRows }] = await Promise.all([
-        supabase.from('insumos').select('quantity, min_quantity').eq('farm_id', farm.id),
-        supabase.from('talhoes').select('area_ha').eq('farm_id', farm.id),
-      ])
+  if (farmsData.length === 0) return []
 
-      const list        = insumos ?? []
-      const emptyCount  = list.filter((i: any) => Number(i.quantity) <= 0).length
-      const lowCount    = list.filter((i: any) =>
-        Number(i.quantity) > 0 &&
-        i.min_quantity != null &&
-        Number(i.quantity) <= Number(i.min_quantity)
-      ).length
+  const farmIds = farmsData.map((f) => f.id)
 
-      const totalAreaHa = (talhaoRows ?? []).reduce((s, t) => s + Number(t.area_ha), 0)
+  // Busca todos os insumos e talhões de todas as fazendas em 2 queries fixas
+  const [{ data: allInsumos }, { data: allTalhoes }] = await Promise.all([
+    supabase.from('insumos').select('farm_id, quantity, min_quantity').in('farm_id', farmIds),
+    supabase.from('talhoes').select('farm_id, area_ha').in('farm_id', farmIds),
+  ])
 
-      return {
-        ...farm,
-        insumoCount: list.length,
-        talhaoCount: (talhaoRows ?? []).length,
-        emptyCount,
-        lowCount,
-        totalAreaHa,
-      }
-    })
-  )
+  const insumosByFarm = new Map<string, { quantity: number; min_quantity: number | null }[]>()
+  for (const i of allInsumos ?? []) {
+    if (!insumosByFarm.has(i.farm_id)) insumosByFarm.set(i.farm_id, [])
+    insumosByFarm.get(i.farm_id)!.push(i)
+  }
 
-  return farmsWithStats
+  const talhoesByFarm = new Map<string, { area_ha: number }[]>()
+  for (const t of allTalhoes ?? []) {
+    if (!talhoesByFarm.has(t.farm_id)) talhoesByFarm.set(t.farm_id, [])
+    talhoesByFarm.get(t.farm_id)!.push(t)
+  }
+
+  return farmsData.map((farm) => {
+    const list       = insumosByFarm.get(farm.id) ?? []
+    const talhaoRows = talhoesByFarm.get(farm.id) ?? []
+
+    const emptyCount = list.filter((i) => Number(i.quantity) <= 0).length
+    const lowCount   = list.filter((i) =>
+      Number(i.quantity) > 0 &&
+      i.min_quantity != null &&
+      Number(i.quantity) <= Number(i.min_quantity)
+    ).length
+
+    const totalAreaHa = talhaoRows.reduce((s, t) => s + Number(t.area_ha), 0)
+
+    return {
+      ...farm,
+      insumoCount: list.length,
+      talhaoCount: talhaoRows.length,
+      emptyCount,
+      lowCount,
+      totalAreaHa,
+    }
+  })
 }
 
 export default async function DashboardPage() {

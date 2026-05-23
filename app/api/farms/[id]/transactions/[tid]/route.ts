@@ -79,12 +79,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     )
   }
 
-  const { error: stockErr } = await supabase
+  const { data: stockUpdated, error: stockErr } = await supabase
     .from('insumos')
     .update({ quantity: newStock })
     .eq('id', tx.insumo_id)
+    .eq('quantity', currentStock)
+    .select('quantity')
 
   if (stockErr) return NextResponse.json({ error: stockErr.message }, { status: 500 })
+  if (!stockUpdated || stockUpdated.length === 0) {
+    return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
+  }
 
   const { data: updated, error: txErr } = await supabase
     .from('transactions')
@@ -139,12 +144,17 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Não é possível excluir: estoque ficaria negativo.' }, { status: 422 })
   }
 
-  const { error: stockErr } = await supabase
+  const { data: stockUpdated, error: stockErr } = await supabase
     .from('insumos')
     .update({ quantity: restoredStock })
     .eq('id', tx.insumo_id)
+    .eq('quantity', currentStock)
+    .select('quantity')
 
   if (stockErr) return NextResponse.json({ error: stockErr.message }, { status: 500 })
+  if (!stockUpdated || stockUpdated.length === 0) {
+    return NextResponse.json({ error: 'Estoque modificado simultaneamente. Tente novamente.' }, { status: 422 })
+  }
 
   const { error: delErr } = await supabase.from('transactions').delete().eq('id', tid)
 

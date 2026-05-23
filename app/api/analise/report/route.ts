@@ -9,8 +9,11 @@ import * as XLSX from 'xlsx'
 type Format = 'pdf' | 'xlsx'
 type Section = 'summary' | 'transactions' | 'by_insumo' | 'by_talhao' | 'operators'
 
-function fmt(d: string) {
-  const [y, m, day] = d.split('-')
+function fmt(d: string | null | undefined): string {
+  if (!d) return '—'
+  const parts = d.split('-')
+  if (parts.length !== 3) return d
+  const [y, m, day] = parts
   return `${day}/${m}/${y}`
 }
 
@@ -31,6 +34,15 @@ export async function GET(req: NextRequest) {
   const talhaoIds = sp.get('talhao_ids')?.split(',').filter(Boolean) ?? []
   const insumoIds = sp.get('insumo_ids')?.split(',').filter(Boolean) ?? []
   const sections  = (sp.get('sections')?.split(',').filter(Boolean) ?? []) as Section[]
+
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRe.test(from) || !dateRe.test(to)) {
+    return NextResponse.json({ error: 'Parâmetro de data inválido.' }, { status: 400 })
+  }
+
+  if (format !== 'pdf' && format !== 'xlsx') {
+    return NextResponse.json({ error: 'Formato inválido. Use pdf ou xlsx.' }, { status: 400 })
+  }
 
   const supabase = createServerClient()
 
@@ -74,7 +86,8 @@ export async function GET(req: NextRequest) {
   if (talhaoIds.length > 0) txQuery = txQuery.in('talhao_id', talhaoIds)
   if (insumoIds.length > 0) txQuery = txQuery.in('insumo_id', insumoIds)
 
-  const { data: txData } = await txQuery
+  const { data: txData, error: txError } = await txQuery
+  if (txError) return NextResponse.json({ error: 'Erro ao consultar transações.' }, { status: 500 })
 
   // 5. Fetch user names
   const userIds = [...new Set((txData ?? []).map((t: { user_id: string | null }) => t.user_id).filter(Boolean))]

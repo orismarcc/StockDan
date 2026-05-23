@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select } from './ui/Select'
 import { Input } from './ui/Input'
@@ -52,6 +52,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
   const [error,     setError]     = useState('')
   const [loading,   setLoading]   = useState(false)
   const [offlineOk, setOfflineOk] = useState(false)
+  const submittingRef = useRef(false)
 
   // Quantidades locais: espelham o servidor, mas são ajustadas otimisticamente offline
   const [localQtys, setLocalQtys] = useState<Record<string, number>>(
@@ -77,6 +78,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submittingRef.current) return // guard contra double-submit
     setError('')
     setOfflineOk(false)
 
@@ -96,6 +98,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
     }
 
     setLoading(true)
+    submittingRef.current = true
 
     const area = areaHa ? parseFloat(areaHa.replace(',', '.')) : null
     const areaPayload = area != null && area > 0 ? area : null
@@ -107,12 +110,14 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
         insumoCache.decreaseQuantity(farmId, insumoId, qty)
         setLocalQtys((prev) => ({ ...prev, [insumoId]: Math.max(0, (prev[insumoId] ?? 0) - qty) }))
         setLoading(false)
+        submittingRef.current = false
         setOfflineOk(true)
         setQuantity('')
         setAreaHa('')
         setNotes('')
       } catch (e) {
         setLoading(false)
+        submittingRef.current = false
         if (e instanceof Error && e.message === 'STORAGE_FULL') {
           setError('Armazenamento local cheio. Conecte-se à internet ou libere espaço no dispositivo.')
         } else {
@@ -131,7 +136,12 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
 
     const data = await res.json()
     setLoading(false)
+    submittingRef.current = false
 
+    if (res.status === 401) {
+      router.push('/login')
+      return
+    }
     if (!res.ok) {
       setError(data.error)
       return
@@ -321,6 +331,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
           placeholder="Finalidade, responsável, equipamento..."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          maxLength={1000}
         />
 
         {error && (

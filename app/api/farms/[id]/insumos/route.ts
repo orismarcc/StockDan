@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
+import { trimField, isValidDate, isValidQuantity, withinLength } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -45,13 +46,28 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
-  const { title, description, unit, quantity, min_quantity, date } = body
+
+  const title       = trimField(body.title)
+  const description = trimField(body.description) // nullable
+  const { unit, quantity, min_quantity, date } = body
 
   if (!title || !unit || quantity === undefined || !date) {
     return NextResponse.json({ error: 'Preencha os campos obrigatórios.' }, { status: 400 })
   }
+  if (!withinLength(title, 120)) {
+    return NextResponse.json({ error: 'Nome do insumo excede 120 caracteres.' }, { status: 400 })
+  }
   if (unit !== 'kg') {
     return NextResponse.json({ error: 'Unidade inválida. Use kg.' }, { status: 400 })
+  }
+  if (!isValidQuantity(quantity) && Number(quantity) !== 0) {
+    return NextResponse.json({ error: 'Quantidade inicial inválida (máx. 9.999.999 kg).' }, { status: 400 })
+  }
+  if (min_quantity !== undefined && min_quantity !== null && !isValidQuantity(min_quantity) && Number(min_quantity) !== 0) {
+    return NextResponse.json({ error: 'Estoque mínimo inválido.' }, { status: 400 })
+  }
+  if (!isValidDate(date)) {
+    return NextResponse.json({ error: 'Data inválida. Use o formato AAAA-MM-DD.' }, { status: 400 })
   }
 
   // RPC atômica: INSERT insumos + INSERT transactions (estoque inicial) em uma transação
@@ -59,10 +75,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     p_farm_id:      farm_id,
     p_user_id:      session.id,
     p_title:        title,
-    p_description:  description || null,
+    p_description:  description,
     p_unit:         unit,
     p_quantity:     Number(quantity),
-    p_min_quantity: min_quantity ? Number(min_quantity) : null,
+    p_min_quantity: min_quantity != null ? Number(min_quantity) : null,
     p_date:         date,
   })
 

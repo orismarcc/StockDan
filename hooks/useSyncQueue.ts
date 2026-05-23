@@ -83,6 +83,7 @@ export function useSyncQueue() {
           if (res.ok) {
             offlineQueue.remove(item.id)
             synced++
+            syncLock.renew() // extend TTL so lock doesn't expire on long syncs
           } else if (res.status === 422 || PERMANENT_ERRORS.includes(res.status)) {
             // [OFFLINE-6] Erros permanentes: descartar imediatamente sem gastar retries
             const body = await res.json().catch(() => ({}))

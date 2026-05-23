@@ -16,6 +16,15 @@ export const syncLock = {
     }
   },
 
+  // Renews the lock timestamp — call periodically during long syncs
+  // so the TTL doesn't expire and let another tab take over mid-sync
+  renew() {
+    try {
+      const existing = localStorage.getItem(LOCK_KEY)
+      if (existing) localStorage.setItem(LOCK_KEY, String(Date.now()))
+    } catch {}
+  },
+
   release() {
     try {
       localStorage.removeItem(LOCK_KEY)

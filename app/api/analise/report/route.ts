@@ -141,16 +141,18 @@ export async function GET(req: NextRequest) {
     const PW = 297, PH = 210
     const ML = 14, MR = 14
     const CW = PW - ML - MR   // 269 mm
-    const HDR = 9              // header bar height
+    const HDR = 12             // header bar height (gray-900 + green accent)
     const FTR = 7              // footer bar height
-    const CT  = HDR + 4       // content top (y = 13)
-    const CB  = PH - FTR      // content bottom (y = 203)
+    const CT  = HDR + 3       // content top
+    const CB  = PH - FTR      // content bottom
 
     const period = `${fmt(from)} a ${fmt(to)}`
 
-    // Palette — alinhada ao tema do projeto (dark, green-500 brand)
-    const GREEN      : RGB = [34, 197, 94]   // green-500 — brand (#22c55e)
-    const GREEN_DARK : RGB = [21, 128, 61]   // green-700 — texto branco sobre fundo verde
+    // ── Paleta alinhada ao tema web: --bg #030712, --surface #111827, green-500 brand
+    const GREEN      : RGB = [34, 197, 94]   // green-500  (#22c55e) — brand
+    const GREEN_DARK : RGB = [21, 128, 61]   // green-700  (#15803d) — tabelas
+    const SURFACE    : RGB = [17, 24, 39]    // gray-900   (#111827) — header bar
+    const ELEVATED   : RGB = [31, 41, 55]    // gray-800   (#1f2937)
     const DARK       : RGB = [17, 24, 39]    // gray-900
     const GRAY800    : RGB = [31, 41, 55]    // gray-800
     const GRAY600    : RGB = [75, 85, 99]    // gray-600
@@ -163,14 +165,21 @@ export async function GET(req: NextRequest) {
     const WHITE      : RGB = [255, 255, 255]
     const BLUE       : RGB = [59, 130, 246]  // blue-500
     const AMBER      : RGB = [245, 158, 11]  // amber-500
-    const AMBER_DARK : RGB = [180, 113, 0]   // amber-700 — texto branco sobre âmbar
+    const AMBER_DARK : RGB = [180, 113, 0]   // amber-700
     const PURPLE     : RGB = [139, 92, 246]  // purple-500
     const RED        : RGB = [239, 68, 68]   // red-500
     const EMERALD    : RGB = [16, 185, 129]  // emerald-500
     const CYAN       : RGB = [6, 182, 212]   // cyan-500
     const ORANGE     : RGB = [249, 115, 22]  // orange-500
 
-    // Paleta dos gráficos de barras — cores do projeto Tailwind
+    // Mescla cor com branco: alpha=1 → cor pura, alpha=0 → branco
+    const tint = (c: RGB, a: number): RGB => [
+      Math.round(c[0] * a + 255 * (1 - a)),
+      Math.round(c[1] * a + 255 * (1 - a)),
+      Math.round(c[2] * a + 255 * (1 - a)),
+    ] as RGB
+
+    // Paleta dos gráficos de barras
     const BAR_PALETTE: RGB[] = [GREEN, BLUE, AMBER, PURPLE, RED, EMERALD, CYAN, ORANGE]
 
     const setF = (c: RGB) => doc.setFillColor(c[0], c[1], c[2])
@@ -181,30 +190,34 @@ export async function GET(req: NextRequest) {
     function drawPageChrome() {
       const pn = (doc as unknown as { getNumberOfPages(): number }).getNumberOfPages()
 
-      setF(GREEN_DARK)
+      // Header — gray-900 com linha accent green-500 (idêntico ao web)
+      setF(SURFACE)
       doc.rect(0, 0, PW, HDR, 'F')
+      setF(GREEN)
+      doc.rect(0, HDR - 1, PW, 1, 'F')   // linha verde na base do header
 
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(9)
-      setT(WHITE)
-      doc.text('STOCKDAN', ML, 6.2)
+      setT(GREEN)
+      doc.text('STOCKDAN', ML, 7.5)
 
       doc.setFontSize(7.5)
-      setT([187, 247, 208] as RGB)
-      doc.text('·', ML + 33, 6.2)
+      setT(GRAY400)
+      doc.text('·', ML + 33, 7.5)
 
       doc.setFont('helvetica', 'normal')
-      doc.text('RELATÓRIO DE APLICAÇÕES', ML + 37, 6.2)
+      setT(GRAY300)
+      doc.text('RELATÓRIO DE APLICAÇÕES', ML + 37, 7.5)
 
       doc.setFontSize(7)
-      doc.text(`${farmName}   ·   ${period}`, PW - MR, 6.2, { align: 'right' })
+      setT(GRAY500)
+      doc.text(`${farmName}   ·   ${period}`, PW - MR, 7.5, { align: 'right' })
 
       // Footer
       setF(GRAY100)
       doc.rect(0, PH - FTR, PW, FTR, 'F')
-      setD(GRAY300)
-      doc.setLineWidth(0.2)
-      doc.line(0, PH - FTR, PW, PH - FTR)
+      setF(GREEN)
+      doc.rect(0, PH - FTR, PW, 0.6, 'F')  // linha verde no topo do footer
 
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(6.5)
@@ -216,28 +229,29 @@ export async function GET(req: NextRequest) {
 
     // ── KPI card ───────────────────────────────────────────────────────────
     function drawKpiCard(x: number, y: number, w: number, h: number, value: string, label: string, sub: string | null, accent: RGB) {
-      setF(GRAY050)
+      // Fundo levemente tintado com a cor do accent (print-friendly)
+      setF(tint(accent, 0.10))
       doc.roundedRect(x, y, w, h, 2, 2, 'F')
 
-      // Accent strip (top rounded, bottom straight)
+      // Borda accent (topo, 5 mm) — solid
       setF(accent)
-      doc.roundedRect(x, y, w, 2.5, 2, 2, 'F')
-      doc.rect(x, y + 1.5, w, 1, 'F')
+      doc.roundedRect(x, y, w, 5, 2, 2, 'F')
+      doc.rect(x, y + 3, w, 2, 'F')   // quadra a parte arredondada de baixo
 
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(20)
+      doc.setFontSize(18)
       setT(DARK)
-      doc.text(value, x + w / 2, y + 17, { align: 'center' })
+      doc.text(value, x + w / 2, y + 18, { align: 'center' })
 
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(7.5)
-      setT(GRAY500)
-      doc.text(label, x + w / 2, y + 23.5, { align: 'center' })
+      setT(GRAY600)
+      doc.text(label, x + w / 2, y + 24, { align: 'center' })
 
       if (sub) {
         doc.setFontSize(6.5)
         setT(GRAY400)
-        doc.text(sub, x + w / 2, y + 28.5, { align: 'center' })
+        doc.text(sub, x + w / 2, y + 29, { align: 'center' })
       }
     }
 
@@ -245,6 +259,11 @@ export async function GET(req: NextRequest) {
     function drawVBar(x: number, y: number, w: number, h: number, title: string, items: { label: string; val: number; color: RGB }[]) {
       setF(GRAY050)
       doc.roundedRect(x, y, w, h, 2, 2, 'F')
+
+      // Barra de título com fundo tintado
+      setF(tint(GREEN, 0.10))
+      doc.roundedRect(x, y, w, 11, 2, 2, 'F')
+      doc.rect(x, y + 7, w, 4, 'F')
 
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(8.5)
@@ -304,6 +323,11 @@ export async function GET(req: NextRequest) {
       setF(GRAY050)
       doc.roundedRect(x, y, w, h, 2, 2, 'F')
 
+      // Barra de título com fundo tintado pelo barColor
+      setF(tint(barColor, 0.10))
+      doc.roundedRect(x, y, w, 11, 2, 2, 'F')
+      doc.rect(x, y + 7, w, 4, 'F')
+
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(8.5)
       setT(DARK)
@@ -352,15 +376,18 @@ export async function GET(req: NextRequest) {
 
     // ── Section divider ────────────────────────────────────────────────────
     function drawSectionHeader(y: number, title: string, accent: RGB): number {
+      // Banner full-width tintado — mesma lógica dos cards do web
+      setF(tint(accent, 0.12))
+      doc.rect(ML, y, CW, 9, 'F')
+      // Barra lateral sólida (accent)
       setF(accent)
-      doc.roundedRect(ML, y, 3.5, 7.5, 0.5, 0.5, 'F')
+      doc.rect(ML, y, 5, 9, 'F')
+
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(10.5)
+      doc.setFontSize(9.5)
       setT(DARK)
-      doc.text(title, ML + 6.5, y + 5.5)
-      setD(GRAY200)
-      doc.setLineWidth(0.25)
-      doc.line(ML, y + 9.5, PW - MR, y + 9.5)
+      doc.text(title.toUpperCase(), ML + 9, y + 6)
+
       return y + 13
     }
 

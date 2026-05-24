@@ -85,9 +85,6 @@ export function TalhaoTabs({
   const [tab, setTab] = useState<TabId>('retiradas')
   const [showNewForm, setShowNewForm] = useState(false)
 
-  // Taxa ativa = taxa_kgha do registro de regulagem mais recente (já vem ordenado desc)
-  const activeTaxa = adjustments.find((a) => a.taxa_kgha != null)?.taxa_kgha ?? null
-
   // Agrupar retiradas por insumo (mantendo ordem mais recente primeiro)
   const txByInsumo = useMemo(() => {
     const groups: { title: string; unit: string; txs: EnrichedTx[] }[] = []
@@ -118,7 +115,6 @@ export function TalhaoTabs({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {summary.map((s) => {
               const avgKgHa = s.hasArea && s.totalArea > 0 ? s.totalQty / s.totalArea : null
-              const haPrevistoTotal = activeTaxa && activeTaxa > 0 ? s.totalQty / activeTaxa : null
               return (
                 <div key={s.title} className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 space-y-2">
                   <p className="text-xs text-gray-500 truncate">{s.title}</p>
@@ -139,18 +135,6 @@ export function TalhaoTabs({
                       <span className="text-amber-500/60 italic">área não registrada</span>
                     )}
                   </div>
-                  {/* Projeção baseada na taxa ativa */}
-                  {haPrevistoTotal != null && (
-                    <div className="pt-1 border-t border-gray-800">
-                      <p className="text-[10px] text-gray-600 mb-0.5">Projeção c/ taxa {fmtKgHa(activeTaxa!)}</p>
-                      <p className="text-xs font-medium text-blue-400/80">
-                        {fmtHa(haPrevistoTotal)}{' '}
-                        <span className="text-gray-600 font-normal">
-                          ({fmtHa(haPrevistoTotal * 0.98)} – {fmtHa(haPrevistoTotal * 1.02)})
-                        </span>
-                      </p>
-                    </div>
-                  )}
                 </div>
               )
             })}
@@ -198,16 +182,6 @@ export function TalhaoTabs({
             </div>
           ) : (
             <div className="space-y-8">
-              {activeTaxa && (
-                <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-400/80">
-                  <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 16v-4M12 8h.01" />
-                  </svg>
-                  Taxa ativa: <span className="font-semibold text-blue-300">{fmtKgHa(activeTaxa)}</span>
-                  <span className="text-gray-600">— coluna "ha prev." calculada com base nesta taxa (±2%)</span>
-                </div>
-              )}
-
               {/* Tabela separada por insumo */}
               {txByInsumo.map((group) => {
                 const groupSummary = summary.find((s) => s.title === group.title)
@@ -252,18 +226,12 @@ export function TalhaoTabs({
                             <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 bg-gray-900/40">
                               <span className="text-green-500/70">kg/ha</span>
                             </th>
-                            {activeTaxa && (
-                              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 bg-blue-900/20">
-                                <span className="text-blue-400/70">ha prev.</span>
-                              </th>
-                            )}
                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Responsável</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Observação</th>
                           </tr>
                         </thead>
                         <tbody>
                           {group.txs.map((tx) => {
-                            const haPrevistoRaw = activeTaxa && activeTaxa > 0 ? tx._qty / activeTaxa : null
                             return (
                               <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
                                 <td className="px-4 py-3 whitespace-nowrap">
@@ -310,24 +278,6 @@ export function TalhaoTabs({
                                     <span className="text-gray-700">—</span>
                                   )}
                                 </td>
-                                {activeTaxa && (
-                                  <td className="px-4 py-3 text-right font-mono whitespace-nowrap bg-blue-900/10">
-                                    {haPrevistoRaw != null ? (
-                                      <div className="text-right">
-                                        <span className="text-blue-300 font-medium">
-                                          {haPrevistoRaw.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                        <span className="block text-[10px] text-gray-600">
-                                          {(haPrevistoRaw * 0.98).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                          {' – '}
-                                          {(haPrevistoRaw * 1.02).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-gray-700">—</span>
-                                    )}
-                                  </td>
-                                )}
                                 <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{(tx as any).users?.name ?? '—'}</td>
                                 <td className="px-4 py-3 text-gray-500 max-w-[160px] truncate">{tx.notes ?? '—'}</td>
                               </tr>

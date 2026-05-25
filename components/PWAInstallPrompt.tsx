@@ -14,41 +14,55 @@ declare global {
   }
 }
 
-const DISMISS_KEY = 'stockdan-pwa-dismissed'
+const DISMISS_KEY  = 'stockdan-pwa-dismissed'
 const DISMISS_DAYS = 7
+const BANNER_DELAY = 2500  // ms após captura do prompt para mostrar o banner
 
 type SwStatus = 'checking' | 'active' | 'installing' | 'unsupported' | 'failed'
 
+function wasDismissedRecently(): boolean {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY)
+    if (!raw) return false
+    return Date.now() - new Date(raw).getTime() < DISMISS_DAYS * 86_400_000
+  } catch { return false }
+}
+
 export function PWAInstallPrompt() {
-  const [isOpen, setIsOpen] = useState(false)
+  const [ready,          setReady]          = useState(false)
+  const [isIOS,          setIsIOS]          = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isIOS, setIsIOS] = useState(false)
-  const [ready, setReady] = useState(false)
-  const [swStatus, setSwStatus] = useState<SwStatus>('checking')
+  const [showBanner,     setShowBanner]     = useState(false)  // banner fixo no rodapé
+  const [isOpen,         setIsOpen]         = useState(false)  // sheet completo
+  const [swStatus,       setSwStatus]       = useState<SwStatus>('checking')
+
+  // ── Exibe banner (respeitando dismiss recente) ─────────────────────────
+  function tryShowBanner() {
+    if (!wasDismissedRecently()) setShowBanner(true)
+  }
 
   useEffect(() => {
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as any).standalone === true
 
-    if (standalone) return
+    if (standalone) return   // já instalado — não mostra nada
 
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
     setIsIOS(ios)
     setReady(true)
 
-    window.__pwaInstallOpen = () => setIsOpen(true)
+    // Expõe abertura do sheet via Sidebar
+    window.__pwaInstallOpen = () => { setIsOpen(true); setShowBanner(false) }
 
-    // Detecta status do SW
+    // Status do Service Worker
     if (!('serviceWorker' in navigator)) {
       setSwStatus('unsupported')
     } else {
       navigator.serviceWorker.getRegistration().then((reg) => {
-        if (!reg) {
-          setSwStatus('failed')
-        } else if (reg.active) {
-          setSwStatus('active')
-        } else {
+        if (!reg)          setSwStatus('failed')
+        else if (reg.active) setSwStatus('active')
+        else {
           setSwStatus('installing')
           const worker = reg.installing ?? reg.waiting
           worker?.addEventListener('statechange', function () {
@@ -58,55 +72,115 @@ export function PWAInstallPrompt() {
       })
     }
 
-    // Captura prompt já salvo pelo script beforeInteractive
-    if (window.__deferredPrompt) {
-      console.log('[PWA] prompt já disponível no mount')
-      setDeferredPrompt(window.__deferredPrompt)
+    // iOS: mostra banner logo de cara (sem prompt nativo)
+    if (ios) {
+      setTimeout(tryShowBanner, BANNER_DELAY)
     }
 
-    // Escuta novos eventos
+    // Verifica prompt já capturado pelo script beforeInteractive
+    if (window.__deferredPrompt) {
+      setDeferredPrompt(window.__deferredPrompt)
+      setTimeout(tryShowBanner, BANNER_DELAY)
+    }
+
+    // Escuta novos eventos de prompt
     const handlePrompt = (e: Event) => {
       e.preventDefault()
       const prompt = e as BeforeInstallPromptEvent
       window.__deferredPrompt = prompt
       setDeferredPrompt(prompt)
-      console.log('[PWA] beforeinstallprompt recebido no componente')
+      setTimeout(tryShowBanner, BANNER_DELAY)
     }
     window.addEventListener('beforeinstallprompt', handlePrompt)
-
-    // Não abre automaticamente — só via clique manual em "Instalar App"
-    // (evita aparecer em momento ruim)
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handlePrompt)
       delete window.__pwaInstallOpen
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Instalar (Android/Chrome) ──────────────────────────────────────────
   async function handleInstall() {
     if (!deferredPrompt) return
+    setShowBanner(false)
+    setIsOpen(false)
     await deferredPrompt.prompt()
     const { outcome } = await deferredPrompt.userChoice
     if (outcome === 'accepted') {
-      setIsOpen(false)
       setDeferredPrompt(null)
       setReady(false)
     }
   }
 
+  // ── Dispensar (salva timestamp) ────────────────────────────────────────
   function handleDismiss() {
-    localStorage.setItem(DISMISS_KEY, new Date().toISOString())
+    try { localStorage.setItem(DISMISS_KEY, new Date().toISOString()) } catch {}
     setIsOpen(false)
+    setShowBanner(false)
   }
 
   if (!ready) return null
 
   return (
     <>
+      {/* ── Banner fixo no rodapé ─────────────────────────────────────── */}
+      {showBanner && !isOpen && (
+        <div className="fixed bottom-0 inset-x-0 z-40 flex items-center gap-3 bg-green-600 px-4 py-3 shadow-2xl">
+          {/* Ícone */}
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden bg-white/15">
+            <img src="/icon-192.png" alt="StockDan" className="h-8 w-8 rounded-lg object-cover" />
+          </div>
+
+          {/* Texto */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white leading-tight">Instalar StockDan</p>
+            <p className="text-xs text-green-100 leading-tight">Acesse offline como app nativo</p>
+          </div>
+
+          {/* Botão principal */}
+          {isIOS ? (
+            <button
+              onClick={() => { setShowBanner(false); setIsOpen(true) }}
+              className="shrink-0 rounded-lg bg-white px-3.5 py-2 text-xs font-bold text-green-700 active:bg-green-50"
+            >
+              Como instalar
+            </button>
+          ) : deferredPrompt ? (
+            <button
+              onClick={handleInstall}
+              className="shrink-0 rounded-lg bg-white px-3.5 py-2 text-xs font-bold text-green-700 active:bg-green-50"
+            >
+              Instalar
+            </button>
+          ) : (
+            <button
+              onClick={() => { setShowBanner(false); setIsOpen(true) }}
+              className="shrink-0 rounded-lg bg-white px-3.5 py-2 text-xs font-bold text-green-700 active:bg-green-50"
+            >
+              Ver instruções
+            </button>
+          )}
+
+          {/* Fechar */}
+          <button
+            onClick={handleDismiss}
+            aria-label="Fechar"
+            className="shrink-0 rounded-md p-1 text-white/70 hover:text-white transition-colors"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* ── Overlay do sheet ──────────────────────────────────────────────── */}
       {isOpen && (
         <div className="fixed inset-0 z-50 bg-black/60" onClick={handleDismiss} />
       )}
 
+      {/* ── Sheet completo (desliza de baixo) ────────────────────────────── */}
       <div
         className={`fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl border-t border-gray-700 bg-gray-900 px-6 pb-8 pt-6 shadow-2xl transition-transform duration-300 ease-out ${
           isOpen ? 'translate-y-0' : 'translate-y-full'
@@ -125,13 +199,13 @@ export function PWAInstallPrompt() {
         </div>
 
         <div className="mb-5 space-y-2.5">
-          <Benefit icon="wifi" label="Funciona offline" sub="Registre retiradas sem internet" />
+          <Benefit icon="wifi"  label="Funciona offline"        sub="Registre retiradas sem internet" />
           <Benefit icon="phone" label="Acesso pela tela inicial" sub="Como um app nativo no celular" />
-          <Benefit icon="zap" label="Carregamento rápido" sub="Abre em segundos" />
+          <Benefit icon="zap"   label="Carregamento rápido"      sub="Abre em segundos" />
         </div>
 
         {isIOS ? (
-          /* iPhone / iPad */
+          /* iPhone / iPad — Safari */
           <div className="space-y-3">
             <p className="text-center text-sm text-gray-400 leading-relaxed">
               No <strong className="text-gray-200">Safari</strong>, toque em{' '}
@@ -145,7 +219,7 @@ export function PWAInstallPrompt() {
             </button>
           </div>
         ) : deferredPrompt ? (
-          /* Android/Chrome com prompt disponível — instalação nativa */
+          /* Android/Chrome — prompt nativo disponível */
           <div className="space-y-2.5">
             <button
               onClick={handleInstall}
@@ -161,9 +235,8 @@ export function PWAInstallPrompt() {
             </button>
           </div>
         ) : (
-          /* Sem prompt disponível — diagnóstico + instrução manual */
+          /* Sem prompt — diagnóstico + instruções manuais */
           <div className="space-y-3">
-            {/* Status do Service Worker */}
             <div className="rounded-xl border border-gray-800 bg-gray-800/40 p-3 text-xs space-y-1.5">
               <p className="font-semibold text-gray-400 mb-2">Diagnóstico</p>
               <div className="flex items-center gap-2">
@@ -179,24 +252,20 @@ export function PWAInstallPrompt() {
             </div>
 
             {swStatus === 'active' ? (
-              /* SW ativo mas sem prompt — Chrome em cooldown */
               <div className="space-y-2">
                 <p className="text-sm text-gray-400 leading-relaxed text-center">
                   O Chrome bloqueou o prompt temporariamente. Para instalar agora:
                 </p>
                 <ol className="text-sm text-gray-400 space-y-1.5">
                   <li className="flex gap-2"><span className="text-green-400 font-bold shrink-0">1.</span> Toque nos <strong className="text-gray-200">⋮ três pontos</strong> do Chrome</li>
-                  <li className="flex gap-2"><span className="text-green-400 font-bold shrink-0">2.</span> Procure <strong className="text-gray-200">"Instalar app"</strong> (não "Adicionar à tela inicial")</li>
-                  <li className="flex gap-2"><span className="text-green-400 font-bold shrink-0">3.</span> Se não aparecer, acesse as <strong className="text-gray-200">Configurações do Chrome → Privacidade → Configurações do site → stockdan-app.vercel.app → Limpar e redefinir</strong> e tente novamente</li>
+                  <li className="flex gap-2"><span className="text-green-400 font-bold shrink-0">2.</span> Procure <strong className="text-gray-200">"Instalar app"</strong></li>
+                  <li className="flex gap-2"><span className="text-green-400 font-bold shrink-0">3.</span> Se não aparecer, acesse <strong className="text-gray-200">Configurações → Privacidade → Configurações do site → stockdan-app.vercel.app → Limpar</strong> e tente de novo</li>
                 </ol>
               </div>
             ) : (
-              /* SW não ativo — problema mais sério */
-              <div className="space-y-2">
-                <p className="text-sm text-amber-400 leading-relaxed text-center">
-                  O Service Worker ainda não está ativo. Tente recarregar a página e abrir este menu novamente.
-                </p>
-              </div>
+              <p className="text-sm text-amber-400 leading-relaxed text-center">
+                O Service Worker ainda não está ativo. Recarregue a página e abra este menu novamente.
+              </p>
             )}
 
             <button onClick={handleDismiss} className="w-full rounded-xl bg-gray-800 py-3 text-sm text-gray-400 hover:bg-gray-700 transition-colors">

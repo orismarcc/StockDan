@@ -1,35 +1,43 @@
 {
-  "name": "StockDan",
+  "name": "StockDan — Gestão de Insumos",
   "short_name": "StockDan",
-  "description": "Gestão de insumos agrícolas",
-  "id": "/",
-  "start_url": "/dashboard",
+  "description": "Gestão de insumos agrícolas para múltiplas fazendas.",
+  "id": "/?source=pwa",
+  "start_url": "/dashboard?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#030712",
   "theme_color": "#22c55e",
-  "orientation": "any",
+  "lang": "pt-BR",
+  "categories": ["productivity", "business", "utilities"],
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/icons/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/icon-512.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

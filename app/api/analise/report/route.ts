@@ -88,13 +88,20 @@ export async function GET(req: NextRequest) {
     id: string; insumo_id: string; talhao_id: string | null
     user_id: string | null; quantity: number; area_ha: number | null
     date: string; notes: string | null
-    users: { name: string }[] | null
+    users: { name: string } | { name: string }[] | null
   }[]
+
+  // Supabase retorna FK one-to-one como objeto, não array — suporta ambos os formatos
+  const resolveName = (u: { name: string } | { name: string }[] | null): string | null => {
+    if (!u) return null
+    if (Array.isArray(u)) return u[0]?.name ?? null
+    return u.name ?? null
+  }
 
   const userMap = Object.fromEntries(
     txs
-      .filter(t => t.user_id && t.users && t.users.length > 0)
-      .map(t => [t.user_id as string, t.users![0].name])
+      .filter(t => t.user_id && resolveName(t.users))
+      .map(t => [t.user_id as string, resolveName(t.users)!])
   )
 
   // ─── PDF ────────────────────────────────────────────────────────────────────

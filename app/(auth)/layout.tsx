@@ -9,7 +9,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             alt="StockDan"
             width={64}
             height={64}
-            className="rounded-2xl shadow-lg shadow-green-500/20"
+            className="rounded-2xl ring-1 ring-white/10 shadow-xl shadow-green-500/30"
           />
           <div className="mt-3">
             <span className="text-2xl font-bold tracking-tight text-white">Stock</span>

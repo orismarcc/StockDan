@@ -2,8 +2,7 @@
   "name": "StockDan — Gestão de Insumos",
   "short_name": "StockDan",
   "description": "Gestão de insumos agrícolas para múltiplas fazendas.",
-  "id": "/?source=pwa",
-  "start_url": "/dashboard?source=pwa",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -12,12 +11,6 @@
   "lang": "pt-BR",
   "categories": ["productivity", "business", "utilities"],
   "icons": [
-    {
-      "src": "/icons/favicon-32.png",
-      "sizes": "32x32",
-      "type": "image/png",
-      "purpose": "any"
-    },
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",

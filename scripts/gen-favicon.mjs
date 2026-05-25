@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC  = path.join(ROOT, 'public', 'icon-512.png');
 
+// Turbopack requer PNG em RGBA (4 canais) dentro do ICO — usa .ensureAlpha()
 const [png16, png32] = await Promise.all([
-  sharp(SRC).resize(16, 16, { fit: 'cover' }).png().toBuffer(),
-  sharp(SRC).resize(32, 32, { fit: 'cover' }).png().toBuffer(),
+  sharp(SRC).resize(16, 16, { fit: 'cover' }).ensureAlpha().png().toBuffer(),
+  sharp(SRC).resize(32, 32, { fit: 'cover' }).ensureAlpha().png().toBuffer(),
 ]);
 
 // ICO: ICONDIR (6 bytes) + 2x ICONDIRENTRY (16 bytes each) + PNG data

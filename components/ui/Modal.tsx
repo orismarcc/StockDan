@@ -41,8 +41,8 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
           className
         )}
       >
-        <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-100">{title}</h2>
+        <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
+          <h2 className="text-base font-semibold text-gray-100 pr-2 leading-snug">{title}</h2>
           <button
             onClick={onClose}
             className="rounded-lg p-2 text-gray-500 hover:bg-gray-800 hover:text-gray-300 transition-colors"
@@ -53,7 +53,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
             </svg>
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-4 py-4 sm:px-6 sm:py-5">{children}</div>
       </div>
     </div>
   )

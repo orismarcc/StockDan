@@ -71,6 +71,39 @@ export function TransactionTable({
     )
   }
 
+  const TypeBadge = ({ type }: { type: 'entrada' | 'saida' }) =>
+    type === 'entrada' ? (
+      <span className="inline-flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 whitespace-nowrap">
+        <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <path d="M6 2.5v7m0 0l-2.5-2.5M6 9.5l2.5-2.5" />
+        </svg>
+        Entrada
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 whitespace-nowrap">
+        <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <path d="M6 9.5v-7m0 0l-2.5 2.5M6 2.5l2.5 2.5" />
+        </svg>
+        Retirada
+      </span>
+    )
+
+  const Pagination = () =>
+    totalPages > 1 ? (
+      <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-4">
+        <p className="text-xs text-gray-600">
+          {page * pageSize + 1}–{Math.min((page + 1) * pageSize, transactions.length)} de {transactions.length}
+        </p>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setPage(0)} disabled={page === 0} className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors" aria-label="Primeira página">«</button>
+          <button onClick={() => setPage((p) => p - 1)} disabled={page === 0} className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors" aria-label="Anterior">‹</button>
+          <span className="px-2 text-xs text-gray-500">{page + 1} / {totalPages}</span>
+          <button onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages - 1} className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors" aria-label="Próxima">›</button>
+          <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1} className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors" aria-label="Última">»</button>
+        </div>
+      </div>
+    ) : null
+
   return (
     <div>
       {deleteError && (
@@ -78,7 +111,93 @@ export function TransactionTable({
           {deleteError}
         </p>
       )}
-      <div className="overflow-x-auto">
+
+      {/* ── Mobile: cards (< sm) ───────────────────────────────────────────── */}
+      <div className="sm:hidden space-y-2">
+        {paginated.map((tx) => (
+          <div key={tx.id} className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+            {/* Linha 1: insumo + tipo */}
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="min-w-0">
+                {showInsumo && (
+                  <p className="text-sm font-medium text-gray-200 truncate">{tx.insumos?.title ?? '—'}</p>
+                )}
+                {tx.talhoes?.name && (
+                  <p className="text-xs text-gray-500 mt-0.5">{tx.talhoes.name}</p>
+                )}
+              </div>
+              <TypeBadge type={tx.type} />
+            </div>
+
+            {/* Linha 2: quantidade + data */}
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-base font-semibold text-gray-100">
+                {tx.insumos ? formatQuantity(tx.quantity, tx.insumos.unit) : tx.quantity}
+              </span>
+              <div className="text-right">
+                <span className="text-xs text-gray-400">{formatDate(tx.date)}</span>
+                {tx.created_at && (
+                  <span className="block text-[11px] text-gray-600">reg. {formatTime(tx.created_at)}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Linha 3: observação + usuário */}
+            {(tx.notes || tx.users?.name) && (
+              <div className="mt-2 pt-2 border-t border-gray-800/60 flex items-center justify-between gap-2">
+                {tx.notes
+                  ? <p className="text-xs text-gray-500 truncate flex-1">{tx.notes}</p>
+                  : <span />
+                }
+                {tx.users?.name && (
+                  <p className="text-xs text-gray-600 shrink-0">{tx.users.name}</p>
+                )}
+              </div>
+            )}
+
+            {/* Linha 4: ações */}
+            {canEdit && (
+              <div className="mt-3 flex gap-2">
+                {confirmDeleteId === tx.id ? (
+                  <>
+                    <button
+                      onClick={() => handleDelete(tx.id)}
+                      disabled={deletingId === tx.id}
+                      className="flex-1 rounded-lg border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                    >
+                      {deletingId === tx.id ? 'Excluindo...' : 'Confirmar'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="flex-1 rounded-lg border border-gray-700 py-2 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => onEdit?.(tx)}
+                      className="flex-1 rounded-lg border border-gray-700 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 transition-colors"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(tx.id)}
+                      className="flex-1 rounded-lg border border-red-500/20 py-2 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+                    >
+                      Excluir
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Desktop: tabela (≥ sm) ─────────────────────────────────────────── */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: '640px' }}>
           <thead>
             <tr className="border-b border-gray-800">
@@ -106,21 +225,7 @@ export function TransactionTable({
                   )}
                 </td>
                 <td className="py-3 pr-4">
-                  {tx.type === 'entrada' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 whitespace-nowrap">
-                      <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
-                        <path d="M6 2.5v7m0 0l-2.5-2.5M6 9.5l2.5-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                      </svg>
-                      Entrada
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 whitespace-nowrap">
-                      <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
-                        <path d="M6 9.5v-7m0 0l-2.5 2.5M6 2.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                      </svg>
-                      Retirada
-                    </span>
-                  )}
+                  <TypeBadge type={tx.type} />
                 </td>
                 {showInsumo && (
                   <td className="py-3 pr-4 text-gray-300">{tx.insumos?.title ?? '—'}</td>
@@ -175,50 +280,7 @@ export function TransactionTable({
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-4">
-          <p className="text-xs text-gray-600">
-            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, transactions.length)} de {transactions.length} registros
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage(0)}
-              disabled={page === 0}
-              className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
-              aria-label="Primeira página"
-            >
-              «
-            </button>
-            <button
-              onClick={() => setPage((p) => p - 1)}
-              disabled={page === 0}
-              className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
-              aria-label="Página anterior"
-            >
-              ‹
-            </button>
-            <span className="px-2 text-xs text-gray-500">
-              {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= totalPages - 1}
-              className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
-              aria-label="Próxima página"
-            >
-              ›
-            </button>
-            <button
-              onClick={() => setPage(totalPages - 1)}
-              disabled={page >= totalPages - 1}
-              className="rounded px-2 py-1 text-xs text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
-              aria-label="Última página"
-            >
-              »
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination />
     </div>
   )
 }

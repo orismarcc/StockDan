@@ -21,7 +21,7 @@ export function ClaimFarmBanner({ farmId }: { farmId: string }) {
   if (done) return null
 
   return (
-    <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-3">
+    <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <div className="flex items-center gap-3">
         <svg className="h-5 w-5 shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
@@ -34,7 +34,7 @@ export function ClaimFarmBanner({ farmId }: { farmId: string }) {
       <button
         onClick={handleClaim}
         disabled={loading}
-        className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/25 disabled:opacity-50 transition-colors"
+        className="self-start rounded-lg border border-amber-500/40 bg-amber-500/15 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/25 disabled:opacity-50 transition-colors sm:self-auto sm:shrink-0 sm:px-3 sm:py-1.5 sm:text-xs"
       >
         {loading ? 'Salvando…' : 'Tornar minha'}
       </button>

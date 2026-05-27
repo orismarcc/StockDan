@@ -113,7 +113,7 @@ export function TalhoesManager({ farmId, initialTalhoes }: TalhoesManagerProps) 
                 <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
                   {editingId === t.id ? (
                     <td colSpan={3} className="px-4 py-3">
-                      <form onSubmit={handleEdit} className="flex gap-3 items-end">
+                      <form onSubmit={handleEdit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <Input
                           label="Nome"
                           value={name}
@@ -129,10 +129,12 @@ export function TalhoesManager({ farmId, initialTalhoes }: TalhoesManagerProps) 
                           value={areaHa}
                           onChange={(e) => setAreaHa(e.target.value)}
                           required
-                          className="w-32"
+                          className="sm:w-32"
                         />
-                        <Button type="submit" size="sm" loading={loading}>Salvar</Button>
-                        <Button type="button" size="sm" variant="ghost" onClick={resetForm}>Cancelar</Button>
+                        <div className="flex gap-2">
+                          <Button type="submit" size="sm" loading={loading}>Salvar</Button>
+                          <Button type="button" size="sm" variant="ghost" onClick={resetForm}>Cancelar</Button>
+                        </div>
                       </form>
                       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
                     </td>

@@ -55,7 +55,7 @@ export function AppShell({ role, userName, children }: AppShellProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-6xl px-4 py-6 lg:px-6 lg:py-8">
+          <div className="mx-auto max-w-6xl px-4 py-4 sm:py-6 lg:px-6 lg:py-8">
             {children}
           </div>
         </div>

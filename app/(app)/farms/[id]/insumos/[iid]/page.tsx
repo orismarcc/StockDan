@@ -63,15 +63,17 @@ export default async function InsumoDetailPage({
           {farm.name}
         </Link>
 
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-100">{insumo.title}</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-gray-100 truncate">{insumo.title}</h1>
             {insumo.description && (
               <p className="mt-1 text-sm text-gray-500">{insumo.description}</p>
             )}
           </div>
           {session.role === 'admin' && (
-            <InsumoActions farmId={farmId} insumo={insumo} />
+            <div className="shrink-0">
+              <InsumoActions farmId={farmId} insumo={insumo} />
+            </div>
           )}
         </div>
       </div>

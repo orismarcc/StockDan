@@ -57,13 +57,16 @@ export function useSyncQueue() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            insumo_id:  item.insumo_id,
-            talhao_id:  item.talhao_id,
-            quantity:   item.quantity,
-            date:       item.date,
-            notes:      item.notes,
-            area_ha:    item.area_ha,
-            offline_id: item.id,
+            insumo_id:         item.insumo_id,
+            talhao_id:         item.talhao_id,
+            quantity:          item.quantity,
+            date:              item.date,
+            notes:             item.notes,
+            area_ha:           item.area_ha,
+            offline_id:        item.id,
+            // Hora real do registro — preserva o timestamp do submit offline,
+            // não a hora em que o dispositivo voltou a ter conexão.
+            created_at_client: item.created_at,
           }),
           signal: controller.signal,
         })

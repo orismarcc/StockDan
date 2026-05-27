@@ -5,6 +5,17 @@ import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { isUUID } from '@/lib/validate'
 
+/** Valida timestamp do cliente: ISO válido, últimos 7 dias até +1 min. */
+function parseClientTimestamp(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'string') return null
+  const ts = new Date(raw)
+  if (isNaN(ts.getTime())) return null
+  const now = Date.now()
+  if (ts.getTime() < now - 7 * 24 * 60 * 60 * 1000) return null
+  if (ts.getTime() > now + 60_000) return null
+  return ts.toISOString()
+}
+
 type Params = { params: Promise<{ id: string }> }
 
 export async function GET(req: NextRequest, { params }: Params) {
@@ -62,6 +73,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   } = body
   const offline_id        = body.offline_id ?? null
   const updated_at_client = body.updated_at_client ?? null
+  // Para POSTs offline, updated_at_client == momento do submit — reutilizamos
+  // como created_at para preservar a hora real do registro.
+  const created_at_client = parseClientTimestamp(body.updated_at_client)
 
   if (offline_id !== null && !isUUID(offline_id)) {
     return NextResponse.json({ error: 'offline_id inválido.' }, { status: 400 })
@@ -101,6 +115,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       comporta: comporta || null,
       offline_id: offline_id || null,
       updated_at_client: updated_at_client || null,
+      // Preserva hora real do registro offline; undefined = coluna usa DEFAULT NOW()
+      ...(created_at_client ? { created_at: created_at_client } : {}),
     })
     .select('*, users(name)')
     .single()

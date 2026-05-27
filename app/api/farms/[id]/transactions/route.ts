@@ -8,6 +8,23 @@ import { isValidDate, isValidQuantity, isUUID, withinLength, trimField } from '@
 
 type Params = { params: Promise<{ id: string }> }
 
+/**
+ * Valida e sanitiza o timestamp enviado pelo cliente para registros offline.
+ * Aceito: ISO 8601 válido, dentro dos últimos 7 dias até +1 minuto.
+ * Retorna null se inválido — a RPC usará NOW() como fallback.
+ */
+function parseClientTimestamp(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'string') return null
+  const ts = new Date(raw)
+  if (isNaN(ts.getTime())) return null
+  const now = Date.now()
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  const oneMinuteMs = 60 * 1000
+  if (ts.getTime() < now - sevenDaysMs) return null // muito antigo
+  if (ts.getTime() > now + oneMinuteMs) return null  // futuro (clock skew tolerado)
+  return ts.toISOString()
+}
+
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT     = 200
 
@@ -68,6 +85,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   const notes      = trimField(body.notes)       // strip leading/trailing whitespace
   const offline_id = body.offline_id ?? null
 
+  // Timestamp do cliente: preserva a hora real do registro offline.
+  // Aceito apenas se for ISO válido e dentro de uma janela razoável
+  // (últimos 7 dias até +1 min), para evitar manipulação de histórico.
+  const created_at_client = parseClientTimestamp(body.created_at_client)
+
   // Validate offline_id format to prevent crafted idempotency keys
   if (offline_id !== null && !isUUID(offline_id)) {
     return NextResponse.json({ error: 'offline_id inválido.' }, { status: 400 })
@@ -116,6 +138,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     p_notes:      notes || null,
     p_area_ha:    area_ha != null && Number(area_ha) > 0 ? Number(area_ha) : null,
     p_offline_id: (offline_id && typeof offline_id === 'string') ? offline_id : null,
+    // Se o cliente enviou timestamp válido, usa; caso contrário a RPC usa NOW()
+    ...(created_at_client ? { p_created_at: created_at_client } : {}),
   })
 
   if (error) {

@@ -8,6 +8,17 @@ import { isUUID } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
 
+/** Valida timestamp do cliente: ISO válido, últimos 7 dias até +1 min. */
+function parseClientTimestamp(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'string') return null
+  const ts = new Date(raw)
+  if (isNaN(ts.getTime())) return null
+  const now = Date.now()
+  if (ts.getTime() < now - 7 * 24 * 60 * 60 * 1000) return null
+  if (ts.getTime() > now + 60_000) return null
+  return ts.toISOString()
+}
+
 export async function POST(req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session || session.role !== 'admin') {
@@ -18,7 +29,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { quantity, date, notes } = body
-  const offline_id = body.offline_id ?? null
+  const offline_id        = body.offline_id ?? null
+  const created_at_client = parseClientTimestamp(body.created_at_client)
 
   if (offline_id !== null && !isUUID(offline_id)) {
     return NextResponse.json({ error: 'offline_id inválido.' }, { status: 400 })
@@ -44,6 +56,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     p_date:       date,
     p_notes:      notes || null,
     p_offline_id: offline_id,
+    ...(created_at_client ? { p_created_at: created_at_client } : {}),
   })
 
   if (error) {

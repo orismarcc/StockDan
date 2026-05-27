@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { mutationQueue } from '@/lib/mutationQueue'
 
 interface AreaCellProps {
   farmId: string
@@ -11,6 +13,7 @@ interface AreaCellProps {
 
 export function AreaCell({ farmId, txId, area }: AreaCellProps) {
   const router = useRouter()
+  const isOnline = useOnlineStatus()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
@@ -37,15 +40,46 @@ export function AreaCell({ farmId, txId, area }: AreaCellProps) {
     setSaving(true)
     setError('')
 
-    const res = await fetch(`/api/farms/${farmId}/transactions/${txId}`, {
+    const updated_at_client = new Date().toISOString()
+    const endpoint = `/api/farms/${farmId}/transactions/${txId}`
+
+    // OFFLINE: enfileira PATCH
+    if (!isOnline) {
+      try {
+        mutationQueue.add({
+          entity: 'transaction',
+          op: 'PATCH',
+          endpoint,
+          payload: { area_ha: ha },
+          target_id: txId,
+        })
+        setSaving(false)
+        setEditing(false)
+        router.refresh()
+      } catch (e) {
+        setSaving(false)
+        setError(e instanceof Error && e.message === 'STORAGE_FULL'
+          ? 'Armazenamento cheio.'
+          : 'Falha ao salvar localmente.')
+      }
+      return
+    }
+
+    // ONLINE
+    const res = await fetch(endpoint, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ area_ha: ha }),
+      body: JSON.stringify({ area_ha: ha, updated_at_client }),
     })
 
     setSaving(false)
 
     if (res.ok) {
+      if (res.headers.get('X-Conflict-Resolution') === 'server-wins') {
+        setError('Outro usuário alterou. Recarregando...')
+        setTimeout(() => { setEditing(false); router.refresh() }, 1500)
+        return
+      }
       setEditing(false)
       router.refresh()
     } else {

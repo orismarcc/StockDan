@@ -21,7 +21,10 @@ const MAX_RETRIES = 5
 export type MutationOp = 'POST' | 'PATCH' | 'DELETE'
 
 /** Tipo de entidade — usado para mensagens no UI e roteamento de cache local. */
-export type MutationEntity = 'implement_adjustment'
+export type MutationEntity =
+  | 'implement_adjustment'
+  | 'transaction'        // edicao/exclusao de retirada existente
+  | 'stock_entry'        // entrada de estoque (admin)
 
 export interface MutationItem {
   /** UUID v4 gerado no cliente. Usado como idempotency key (`offline_id`) e

@@ -37,10 +37,14 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
 
     setLoading(true)
     submittingRef.current = true
+
+    // Idempotency mesmo online: protege contra retry de timeout do navegador
+    const offline_id = crypto.randomUUID()
+
     const res = await fetch(`/api/farms/${farmId}/insumos/${insumoId}/stock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: qty, date, notes }),
+      body: JSON.stringify({ quantity: qty, date, notes, offline_id }),
     })
 
     const data = await res.json()

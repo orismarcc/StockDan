@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
+import { isUUID } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
 
@@ -17,6 +18,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { quantity, date, notes } = body
+  const offline_id = body.offline_id ?? null
+
+  if (offline_id !== null && !isUUID(offline_id)) {
+    return NextResponse.json({ error: 'offline_id inválido.' }, { status: 400 })
+  }
 
   if (!quantity || Number(quantity) <= 0 || !date) {
     return NextResponse.json({ error: 'Quantidade e data são obrigatórias.' }, { status: 400 })
@@ -29,13 +35,15 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // RPC atômica: UPDATE insumos + INSERT transactions em uma transação PostgreSQL
+  // p_offline_id garante idempotencia em retry de timeout (mesmo pattern de registrar_saida)
   const { data: rpc, error } = await supabase.rpc('registrar_entrada', {
-    p_farm_id:   farm_id,
-    p_insumo_id: insumo_id,
-    p_user_id:   session.id,
-    p_quantity:  Number(quantity),
-    p_date:      date,
-    p_notes:     notes || null,
+    p_farm_id:    farm_id,
+    p_insumo_id:  insumo_id,
+    p_user_id:    session.id,
+    p_quantity:   Number(quantity),
+    p_date:       date,
+    p_notes:      notes || null,
+    p_offline_id: offline_id,
   })
 
   if (error) {

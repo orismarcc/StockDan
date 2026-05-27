@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn, formatDate, formatTime, formatQuantity } from '@/lib/utils'
 import { AreaCell } from './AreaCell'
 import { ImplementAdjustmentForm } from './ImplementAdjustmentForm'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { mutationQueue } from '@/lib/mutationQueue'
+import { regulagemCache } from '@/lib/regulagemCache'
 
 // ─── types ──────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,14 @@ export function TalhaoTabs({
 }: TalhaoTabsProps) {
   const [tab, setTab] = useState<TabId>('retiradas')
   const [showNewForm, setShowNewForm] = useState(false)
+
+  // Popula cache local para uso offline (TalhaoTabs sempre recebe dados frescos
+  // do server quando renderiza, entao aproveitamos para atualizar o cache)
+  useEffect(() => {
+    try {
+      regulagemCache.setTalhao(talhaoId, adjustments)
+    } catch { /* STORAGE_FULL — ignora */ }
+  }, [talhaoId, adjustments])
 
   // Agrupar retiradas por insumo (mantendo ordem mais recente primeiro)
   const txByInsumo = useMemo(() => {

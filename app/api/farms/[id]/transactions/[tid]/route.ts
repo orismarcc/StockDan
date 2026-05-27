@@ -8,6 +8,30 @@ import { isValidDate, isValidQuantity, isValidAreaHa, withinLength, trimField } 
 
 type Params = { params: Promise<{ id: string; tid: string }> }
 
+/** Helper LWW: compara updated_at_client com server.updated_at. Retorna a
+ *  Response 200 com header X-Conflict-Resolution se o cliente perdeu. */
+async function checkLwwConflict(
+  supabase: ReturnType<typeof createServerClient>,
+  tid: string,
+  farm_id: string,
+  updated_at_client: string | null
+): Promise<Response | null> {
+  if (!updated_at_client) return null
+  const { data: current } = await supabase
+    .from('transactions')
+    .select('*, insumos(title, unit), talhoes(id, name), users(name)')
+    .eq('id', tid)
+    .eq('farm_id', farm_id)
+    .maybeSingle()
+  if (current && current.updated_at && current.updated_at > updated_at_client) {
+    return NextResponse.json(current, {
+      status: 200,
+      headers: { 'X-Conflict-Resolution': 'server-wins' },
+    })
+  }
+  return null
+}
+
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
@@ -23,6 +47,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { quantity, date, talhao_id, area_ha } = body
   const notes = trimField(body.notes)
+  const updated_at_client = body.updated_at_client ?? null
 
   // ── Atualização de área aplicada (qualquer usuário com acesso à fazenda) ────
   // Não toca no estoque — sem necessidade de RPC.
@@ -31,9 +56,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Área deve ser maior que zero (máx. 9.999.999 ha).' }, { status: 400 })
     }
 
+    // [LWW] Cliente perdeu? Retorna estado atual sem aplicar
+    const conflict = await checkLwwConflict(supabase, tid, farm_id, updated_at_client)
+    if (conflict) return conflict
+
     const { error } = await supabase
       .from('transactions')
-      .update({ area_ha: area_ha })
+      .update({
+        area_ha: area_ha,
+        updated_at_client: updated_at_client || null,
+      })
       .eq('id', tid)
       .eq('farm_id', farm_id)
 
@@ -59,6 +91,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Observação excede 1.000 caracteres.' }, { status: 400 })
   }
 
+  // [LWW] Check antes da RPC (nao-atomico mas suficiente — RPC ja serializa via FOR UPDATE)
+  const conflict = await checkLwwConflict(supabase, tid, farm_id, updated_at_client)
+  if (conflict) return conflict
+
   // RPC atômica: ajusta estoque + atualiza transaction em uma transação PostgreSQL
   const { data: rpc, error } = await supabase.rpc('editar_transacao', {
     p_tid:       tid,
@@ -75,6 +111,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const { transaction_id } = rpc as { transaction_id: string; new_quantity: number }
+
+  // Persiste updated_at_client separadamente (RPC nao recebe esse campo)
+  if (updated_at_client) {
+    await supabase
+      .from('transactions')
+      .update({ updated_at_client })
+      .eq('id', transaction_id)
+  }
 
   // Busca transaction atualizada com joins para o response
   const { data: updated } = await supabase
@@ -106,6 +150,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   })
 
   if (error) {
+    // [IDEMPOTENT-DELETE] Se transacao ja foi deletada (PGRST116 ou similar),
+    // tratamos como sucesso para retry offline
+    const code = (error as { code?: string }).code
+    if (code === 'PGRST116' || code === '23503') {
+      return NextResponse.json({ ok: true, already_deleted: true })
+    }
     const { status, message } = parseRpcError(error)
     return NextResponse.json({ error: message }, { status })
   }

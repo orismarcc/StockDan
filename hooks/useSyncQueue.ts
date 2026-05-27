@@ -207,6 +207,11 @@ export function useSyncQueue() {
     if (isOnline && total > 0) {
       sync()
     }
+    // Auth refresh silencioso quando volta online: renova JWT (7d fresh)
+    // para que o usuario nao seja deslogado apos longo periodo offline.
+    if (isOnline) {
+      fetch('/api/auth/refresh', { method: 'POST', cache: 'no-store' }).catch(() => {})
+    }
   }, [isOnline, sync])
 
   const clearRejected = useCallback(() => setRejectedItems([]), [])

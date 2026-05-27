@@ -3,7 +3,7 @@
 import { useSyncQueue } from '@/hooks/useSyncQueue'
 
 export function ConnectionStatus() {
-  const { isOnline, syncing, pendingCount, rejectedItems, clearRejected } = useSyncQueue()
+  const { isOnline, syncing, pendingCount, rejectedItems, clearRejected, sync } = useSyncQueue()
 
   if (rejectedItems.length > 0) {
     return (
@@ -39,23 +39,44 @@ export function ConnectionStatus() {
         </svg>
         <span>
           Sem conexão — <strong>modo offline.</strong> Operações serão sincronizadas ao reconectar.
+          {pendingCount > 0 && (
+            <span className="ml-1">({pendingCount} pendente{pendingCount !== 1 ? 's' : ''})</span>
+          )}
         </span>
       </div>
     )
   }
 
   return (
-    <div className="z-30 w-full flex items-center justify-center gap-2 bg-amber-950/95 py-2.5 text-sm text-amber-200">
-      <svg className="h-4 w-4 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-      </svg>
-      <span>
-        Sincronizando{' '}
-        <strong>
-          {pendingCount} operaç{pendingCount === 1 ? 'ão' : 'ões'}
-        </strong>{' '}
-        pendente{pendingCount !== 1 ? 's' : ''}...
-      </span>
+    <div className="z-30 w-full flex items-center justify-center gap-3 bg-amber-950/95 py-2.5 text-sm text-amber-200">
+      {syncing ? (
+        <>
+          <svg className="h-4 w-4 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          <span>
+            Sincronizando{' '}
+            <strong>{pendingCount} operaç{pendingCount === 1 ? 'ão' : 'ões'}</strong>
+            {' '}pendente{pendingCount !== 1 ? 's' : ''}...
+          </span>
+        </>
+      ) : (
+        <>
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>
+            <strong>{pendingCount} operaç{pendingCount === 1 ? 'ão' : 'ões'}</strong>
+            {' '}pendente{pendingCount !== 1 ? 's' : ''} aguardando sincronização.
+          </span>
+          <button
+            onClick={() => sync()}
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200 hover:bg-amber-500/20 transition-colors"
+          >
+            Sincronizar agora
+          </button>
+        </>
+      )}
     </div>
   )
 }

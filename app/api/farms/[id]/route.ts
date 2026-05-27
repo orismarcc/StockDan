@@ -40,17 +40,33 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
-  const body = await parseBody<{ name?: string; city?: string; state?: string; farmer_name?: string }>(req)
+  const body = await parseBody<{ name?: string; city?: string; state?: string; farmer_name?: string; updated_at_client?: string }>(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { name, city, state, farmer_name } = body
+  const updated_at_client = body.updated_at_client ?? null
 
   if (!name || !city || !state || !farmer_name) {
     return NextResponse.json({ error: 'Preencha todos os campos.' }, { status: 400 })
   }
 
+  // [LWW] Server vence se foi modificado depois que cliente fez a alteracao
+  if (updated_at_client) {
+    const { data: current } = await supabase
+      .from('farms').select('*').eq('id', id).maybeSingle()
+    if (current && current.updated_at && current.updated_at > updated_at_client) {
+      return NextResponse.json(current, {
+        status: 200,
+        headers: { 'X-Conflict-Resolution': 'server-wins' },
+      })
+    }
+  }
+
   const { data, error } = await supabase
     .from('farms')
-    .update({ name, city, state: state.toUpperCase(), farmer_name })
+    .update({
+      name, city, state: state.toUpperCase(), farmer_name,
+      updated_at_client: updated_at_client || null,
+    })
     .eq('id', id)
     .select()
     .single()

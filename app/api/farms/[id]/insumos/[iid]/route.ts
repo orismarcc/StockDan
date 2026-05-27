@@ -46,6 +46,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { title, description, min_quantity, quantity, adjustment_notes } = body
+  const updated_at_client = body.updated_at_client ?? null
+
+  // [LWW] aplica em metadata updates (nao em ajustar_estoque, que e atomico via RPC)
+  if (updated_at_client && quantity === undefined) {
+    const { data: current } = await supabase
+      .from('insumos').select('*').eq('id', iid).eq('farm_id', farm_id).maybeSingle()
+    if (current && current.updated_at && current.updated_at > updated_at_client) {
+      return NextResponse.json(current, {
+        status: 200,
+        headers: { 'X-Conflict-Resolution': 'server-wins' },
+      })
+    }
+  }
 
   // ── Ajuste de quantidade: RPC atômica ──────────────────────────────────────
   if (quantity !== undefined) {
@@ -97,6 +110,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: 'Nenhum campo para atualizar.' }, { status: 400 })
   }
+
+  if (updated_at_client) updateData.updated_at_client = updated_at_client
 
   const { data, error } = await supabase
     .from('insumos')

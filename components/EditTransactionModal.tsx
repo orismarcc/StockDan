@@ -8,6 +8,8 @@ import { Textarea } from './ui/Textarea'
 import { Button } from './ui/Button'
 import { Select } from './ui/Select'
 import type { Transaction } from './TransactionTable'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { mutationQueue } from '@/lib/mutationQueue'
 
 interface Talhao {
   id: string
@@ -36,8 +38,10 @@ export function EditTransactionModal({
   const [notes, setNotes] = useState(transaction.notes ?? '')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [offlineOk, setOfflineOk] = useState(false)
   const submittingRef = useRef(false)
   const router = useRouter()
+  const isOnline = useOnlineStatus()
 
   const unitLabel = 'kg'
   const typeLabel = transaction.type === 'entrada' ? 'Entrada' : 'Retirada'
@@ -55,15 +59,42 @@ export function EditTransactionModal({
 
     setLoading(true)
     submittingRef.current = true
-    const res = await fetch(`/api/farms/${farmId}/transactions/${transaction.id}`, {
+    const updated_at_client = new Date().toISOString()
+    const endpoint = `/api/farms/${farmId}/transactions/${transaction.id}`
+    const payload = {
+      quantity: qty,
+      date,
+      talhao_id: talhaoId || undefined,
+      notes: notes || null,
+    }
+
+    // OFFLINE: enfileira PATCH
+    if (!isOnline) {
+      try {
+        mutationQueue.add({
+          entity: 'transaction',
+          op: 'PATCH',
+          endpoint,
+          payload,
+          target_id: transaction.id,
+        })
+        setLoading(false); submittingRef.current = false
+        setOfflineOk(true)
+        setTimeout(() => onSuccess(), 1500)
+      } catch (e) {
+        setLoading(false); submittingRef.current = false
+        setError(e instanceof Error && e.message === 'STORAGE_FULL'
+          ? 'Armazenamento cheio.'
+          : 'Falha ao salvar localmente.')
+      }
+      return
+    }
+
+    // ONLINE
+    const res = await fetch(endpoint, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        quantity: qty,
-        date,
-        talhao_id: talhaoId || undefined,
-        notes: notes || null,
-      }),
+      body: JSON.stringify({ ...payload, updated_at_client }),
     })
 
     const data = await res.json()
@@ -73,6 +104,11 @@ export function EditTransactionModal({
     if (res.status === 401) { router.push('/login'); return }
     if (!res.ok) {
       setError(data.error)
+      return
+    }
+    if (res.headers.get('X-Conflict-Resolution') === 'server-wins') {
+      setError('Outro usuário alterou. Recarregando...')
+      setTimeout(() => onSuccess(), 1500)
       return
     }
     onSuccess()
@@ -119,14 +155,26 @@ export function EditTransactionModal({
           maxLength={1000}
         />
 
+        {!isOnline && (
+          <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            Sem conexão — alteração será sincronizada ao reconectar.
+          </p>
+        )}
         {error && (
           <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
             {error}
           </p>
         )}
+        {offlineOk && (
+          <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+            Alteração salva offline. Será enviada ao reconectar.
+          </p>
+        )}
 
         <div className="flex gap-3 pt-1">
-          <Button type="submit" loading={loading}>Salvar alterações</Button>
+          <Button type="submit" loading={loading}>
+            {isOnline ? 'Salvar alterações' : 'Salvar Offline'}
+          </Button>
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
       </form>

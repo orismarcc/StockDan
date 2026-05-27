@@ -22,6 +22,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
+  const updated_at_client = body.updated_at_client ?? null
 
   const name = trimField(body.name)
   if (!name) return NextResponse.json({ error: 'Nome é obrigatório.' }, { status: 400 })
@@ -31,9 +32,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
   const area_ha = Number(body.area_ha)
 
+  // [LWW]
+  if (updated_at_client) {
+    const { data: current } = await supabase
+      .from('talhoes').select('*').eq('id', tid).eq('farm_id', farm_id).maybeSingle()
+    if (current && current.updated_at && current.updated_at > updated_at_client) {
+      return NextResponse.json(current, {
+        status: 200,
+        headers: { 'X-Conflict-Resolution': 'server-wins' },
+      })
+    }
+  }
+
   const { data, error } = await supabase
     .from('talhoes')
-    .update({ name, area_ha })
+    .update({ name, area_ha, updated_at_client: updated_at_client || null })
     .eq('id', tid)
     .eq('farm_id', farm_id)
     .select()

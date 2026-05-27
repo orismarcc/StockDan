@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken, COOKIE } from '@/lib/auth'
 
 // Rotas que não exigem sessão
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/ping']
+const PUBLIC_PATHS = [
+  '/login',
+  '/api/auth/login',
+  '/api/ping',
+  // PWA: service worker, manifest e icons devem ser publicos para registro
+  // funcionar (Chrome carrega esses recursos antes do login).
+  '/sw.js',
+  '/manifest.json',
+  '/icons/',
+]
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl

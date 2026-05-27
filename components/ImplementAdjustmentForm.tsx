@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { mutationQueue } from '@/lib/mutationQueue'
 
 interface ImplementAdjustmentFormProps {
   farmId: string
@@ -84,10 +86,12 @@ export function ImplementAdjustmentForm({
   onSuccess,
   onCancel,
 }: ImplementAdjustmentFormProps) {
-  const router = useRouter()
-  const [form, setForm] = useState<FormData>({ ...EMPTY, ...initialData })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const router   = useRouter()
+  const isOnline = useOnlineStatus()
+  const [form,      setForm]      = useState<FormData>({ ...EMPTY, ...initialData })
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [offlineOk, setOfflineOk] = useState(false)
 
   const isEditing = Boolean(adjId)
 
@@ -99,20 +103,63 @@ export function ImplementAdjustmentForm({
     e.preventDefault()
     setSaving(true)
     setError('')
+    setOfflineOk(false)
 
+    const payload = { ...form, talhao_id: talhaoId }
+
+    // ── Offline: enfileira mutacao ──────────────────────────────────────────
+    if (!isOnline) {
+      try {
+        mutationQueue.add({
+          entity: 'implement_adjustment',
+          op: isEditing ? 'PATCH' : 'POST',
+          endpoint: isEditing
+            ? `/api/farms/${farmId}/implement-adjustments/${adjId}`
+            : `/api/farms/${farmId}/implement-adjustments`,
+          payload,
+          target_id: adjId,
+        })
+        setSaving(false)
+        setOfflineOk(true)
+        if (!isEditing) setForm(EMPTY)
+        // Aviso ao usuario por 2.5s antes de fechar
+        setTimeout(() => { onSuccess?.(); router.refresh() }, 2500)
+      } catch (e) {
+        setSaving(false)
+        if (e instanceof Error && e.message === 'STORAGE_FULL') {
+          setError('Armazenamento local cheio. Conecte-se à internet ou libere espaço no dispositivo.')
+        } else {
+          setError('Falha ao salvar localmente. Tente novamente.')
+        }
+      }
+      return
+    }
+
+    // ── Online: envia direto, mas com offline_id para idempotencia ────────
     const url = isEditing
       ? `/api/farms/${farmId}/implement-adjustments/${adjId}`
       : `/api/farms/${farmId}/implement-adjustments`
 
+    // Gera offline_id mesmo online — protege contra timeout/retry do navegador
+    // (se requisicao timeout mas chegou ao servidor, retentar nao duplica)
+    const offline_id = isEditing ? undefined : crypto.randomUUID()
+    const updated_at_client = new Date().toISOString()
+
     const res = await fetch(url, {
       method: isEditing ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, talhao_id: talhaoId }),
+      body: JSON.stringify({ ...payload, offline_id, updated_at_client }),
     })
 
     setSaving(false)
 
     if (res.ok) {
+      // Detecta resolucao de conflito server-wins (PATCH com updated_at_client antigo)
+      if (res.headers.get('X-Conflict-Resolution') === 'server-wins') {
+        setError('Outro usuário já alterou esta regulagem. Recarregando os dados mais recentes.')
+        setTimeout(() => { router.refresh(); onSuccess?.() }, 2000)
+        return
+      }
       if (!isEditing) setForm(EMPTY)
       router.refresh()
       onSuccess?.()
@@ -124,6 +171,16 @@ export function ImplementAdjustmentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {!isOnline && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400 flex items-center gap-2">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="1" y1="1" x2="23" y2="23" />
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
+          </svg>
+          <span>Sem conexão — a regulagem será salva localmente e sincronizada ao reconectar.</span>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Field label="Implemento" name="implemento" value={form.implemento} onChange={set} placeholder="Ex: Distribuidora centrífuga" />
@@ -149,6 +206,14 @@ export function ImplementAdjustmentForm({
       {error && (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
       )}
+      {offlineOk && (
+        <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400 flex items-center gap-2">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>Regulagem salva offline. Será enviada ao servidor ao reconectar.</span>
+        </p>
+      )}
 
       <div className="flex gap-3">
         <button
@@ -156,7 +221,7 @@ export function ImplementAdjustmentForm({
           disabled={saving}
           className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-60 transition-colors"
         >
-          {saving ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar Regulagem'}
+          {saving ? 'Salvando...' : isEditing ? (isOnline ? 'Salvar Alterações' : 'Salvar Offline') : (isOnline ? 'Salvar Regulagem' : 'Salvar Offline')}
         </button>
         {onCancel && (
           <button

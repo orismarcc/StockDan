@@ -32,6 +32,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     faixa_aplicacao,
     comporta,
   } = body
+  const updated_at_client = body.updated_at_client ?? null
+
+  // [LWW] Se cliente envia updated_at_client e o registro foi modificado depois
+  // por outro user, ignora silenciosamente (retorna o estado atual do servidor).
+  // Evita que um PATCH offline antigo sobrescreva mudanca mais recente de outro user.
+  if (updated_at_client) {
+    const { data: current } = await supabase
+      .from('implement_adjustments')
+      .select('*, users(name)')
+      .eq('id', adjId)
+      .eq('farm_id', farm_id)
+      .maybeSingle()
+
+    if (current && current.updated_at && current.updated_at > updated_at_client) {
+      // Cliente perdeu o conflito — retorna estado atual do servidor (200 OK,
+      // mas sem ter aplicado a mudanca). Cliente deve reconciliar com este estado.
+      return NextResponse.json(current, {
+        status: 200,
+        headers: { 'X-Conflict-Resolution': 'server-wins' },
+      })
+    }
+  }
 
   const { data, error } = await supabase
     .from('implement_adjustments')
@@ -46,6 +68,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       cv_percent:           cv_percent           ? Number(cv_percent)           : null,
       faixa_aplicacao:      faixa_aplicacao      || null,
       comporta:             comporta             || null,
+      updated_at_client:    updated_at_client    || null,
     })
     .eq('id', adjId)
     .eq('farm_id', farm_id)
@@ -73,6 +96,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .eq('id', adjId)
     .eq('farm_id', farm_id)
 
+  // [IDEMPOTENT-DELETE] Mesmo se registro ja foi deletado, retorna 200.
+  // Cliente que retentou DELETE offline ve sucesso (nao falha) na segunda tentativa.
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

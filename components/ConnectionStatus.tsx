@@ -14,7 +14,7 @@ export function ConnectionStatus() {
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <span>
-              <strong>{rejectedItems.length} retirada{rejectedItems.length !== 1 ? 's' : ''} rejeitada{rejectedItems.length !== 1 ? 's' : ''} pelo servidor</strong>
+              <strong>{rejectedItems.length} operaç{rejectedItems.length !== 1 ? 'ões' : 'ão'} rejeitada{rejectedItems.length !== 1 ? 's' : ''} pelo servidor</strong>
               {' — '}{rejectedItems[0].reason}
             </span>
           </div>
@@ -38,7 +38,7 @@ export function ConnectionStatus() {
           <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
         </svg>
         <span>
-          Sem conexão — <strong>modo offline.</strong> Retiradas serão sincronizadas ao reconectar.
+          Sem conexão — <strong>modo offline.</strong> Operações serão sincronizadas ao reconectar.
         </span>
       </div>
     )

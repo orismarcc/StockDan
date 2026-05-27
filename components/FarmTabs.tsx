@@ -11,6 +11,7 @@ import { EditTransactionModal } from './EditTransactionModal'
 import { ConfirmDeleteButton } from './ConfirmDeleteButton'
 import { RegulagemModal } from './RegulagemModal'
 import { Button } from './ui/Button'
+import { useFarmPrefetch } from '@/hooks/useFarmPrefetch'
 
 type TabId = 'talhoes' | 'insumos' | 'historico'
 
@@ -36,6 +37,9 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
   const [editQtyFor, setEditQtyFor] = useState<{ id: string; title: string; unit: string; currentQty: number } | null>(null)
   const [regulagemFor, setRegulagemFor] = useState<{ id: string; name: string } | null>(null)
   const router = useRouter()
+
+  // Pre-cache sub-rotas para uso offline (retirada, cada talhao)
+  useFarmPrefetch(farm.id, talhoes.map(t => t.id))
 
   const handleRouterRefresh = useCallback(() => router.refresh(), [router])
 

@@ -40,18 +40,27 @@ export const insumoCache = {
     write(all)
   },
 
+  /**
+   * Retorna insumos cached, mesmo que stale. Use `isStale()` para mostrar warning.
+   * Antes retornava `[]` se >4h, mas isso quebrava UX offline — operario nao
+   * via insumos algum em vez de "dados de 5h atras".
+   */
   getFarm(farmId: string): CachedInsumo[] {
     const entry = read()[farmId]
     if (!entry) return []
-    const age = Date.now() - new Date(entry.lastUpdated).getTime()
-    if (age > CACHE_TTL_MS) return [] // expirado — forçar busca no servidor
     return entry.insumos
   },
 
-  isStale(farmId: string): boolean {
+  /** Retorna idade do cache em ms, ou null se sem cache. */
+  getAge(farmId: string): number | null {
     const entry = read()[farmId]
-    if (!entry) return true
-    return Date.now() - new Date(entry.lastUpdated).getTime() > CACHE_TTL_MS
+    if (!entry) return null
+    return Date.now() - new Date(entry.lastUpdated).getTime()
+  },
+
+  isStale(farmId: string): boolean {
+    const age = insumoCache.getAge(farmId)
+    return age === null || age > CACHE_TTL_MS
   },
 
   decreaseQuantity(farmId: string, insumoId: string, amount: number) {

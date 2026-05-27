@@ -8,6 +8,7 @@ import { Textarea } from './ui/Textarea'
 import { Button } from './ui/Button'
 import { formatQuantity, todayISO } from '@/lib/utils'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { offlineQueue } from '@/lib/offlineQueue'
 import { insumoCache } from '@/lib/insumoCache'
 
@@ -43,12 +44,24 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
   const router   = useRouter()
   const isOnline = useOnlineStatus()
 
-  const [insumoId,  setInsumoId]  = useState('')
-  const [talhaoId,  setTalhaoId]  = useState(initialTalhaoId)
-  const [quantity,  setQuantity]  = useState('')
-  const [areaHa,    setAreaHa]    = useState('')
-  const [date,      setDate]      = useState(todayISO())
-  const [notes,     setNotes]     = useState('')
+  // Draft persistido em localStorage — restaura se user fechou aba sem submeter
+  const { state: draft, setState: setDraft, clear: clearDraft } = useFormDraft(
+    `withdrawal_${farmId}_${initialTalhaoId || 'any'}`,
+    { insumoId: '', talhaoId: initialTalhaoId, quantity: '', areaHa: '', date: todayISO(), notes: '' }
+  )
+  const insumoId  = draft.insumoId
+  const talhaoId  = draft.talhaoId
+  const quantity  = draft.quantity
+  const areaHa    = draft.areaHa
+  const date      = draft.date
+  const notes     = draft.notes
+  const setInsumoId = (v: string) => setDraft(p => ({ ...p, insumoId: v }))
+  const setTalhaoId = (v: string) => setDraft(p => ({ ...p, talhaoId: v }))
+  const setQuantity = (v: string) => setDraft(p => ({ ...p, quantity: v }))
+  const setAreaHa   = (v: string) => setDraft(p => ({ ...p, areaHa: v }))
+  const setDate     = (v: string) => setDraft(p => ({ ...p, date: v }))
+  const setNotes    = (v: string) => setDraft(p => ({ ...p, notes: v }))
+
   const [error,     setError]     = useState('')
   const [loading,   setLoading]   = useState(false)
   const [offlineOk, setOfflineOk] = useState(false)
@@ -112,9 +125,8 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
         setLoading(false)
         submittingRef.current = false
         setOfflineOk(true)
-        setQuantity('')
-        setAreaHa('')
-        setNotes('')
+        clearDraft()
+        setQuantity(''); setAreaHa(''); setNotes(''); setInsumoId('')
       } catch (e) {
         setLoading(false)
         submittingRef.current = false
@@ -147,6 +159,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
       return
     }
 
+    clearDraft()
     router.push(`/farms/${farmId}`)
   }
 

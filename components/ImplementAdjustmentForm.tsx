@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { mutationQueue } from '@/lib/mutationQueue'
 
 interface ImplementAdjustmentFormProps {
@@ -88,15 +89,26 @@ export function ImplementAdjustmentForm({
 }: ImplementAdjustmentFormProps) {
   const router   = useRouter()
   const isOnline = useOnlineStatus()
-  const [form,      setForm]      = useState<FormData>({ ...EMPTY, ...initialData })
+
+  // Draft: nova regulagem usa draft localStorage. Edicao nao (initialData ja
+  // carrega da regulagem existente — confundir com draft pode sobrescrever
+  // edicao com nova-criacao abandonada).
+  const isEditing = Boolean(adjId)
+  const draftKey = `regulagem_${farmId}_${talhaoId}`
+  const draft = useFormDraft<FormData>(draftKey, { ...EMPTY, ...initialData })
+  const [form, setForm] = useState<FormData>(
+    isEditing ? { ...EMPTY, ...initialData } : draft.state
+  )
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [offlineOk, setOfflineOk] = useState(false)
 
-  const isEditing = Boolean(adjId)
-
   function set(name: keyof FormData, value: string) {
-    setForm((prev) => ({ ...prev, [name]: value }))
+    setForm((prev) => {
+      const next = { ...prev, [name]: value }
+      if (!isEditing) draft.setState(next)  // auto-save apenas em nova
+      return next
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -121,7 +133,7 @@ export function ImplementAdjustmentForm({
         })
         setSaving(false)
         setOfflineOk(true)
-        if (!isEditing) setForm(EMPTY)
+        if (!isEditing) { setForm(EMPTY); draft.clear() }
         // Aviso ao usuario por 2.5s antes de fechar
         setTimeout(() => { onSuccess?.(); router.refresh() }, 2500)
       } catch (e) {
@@ -160,7 +172,7 @@ export function ImplementAdjustmentForm({
         setTimeout(() => { router.refresh(); onSuccess?.() }, 2000)
         return
       }
-      if (!isEditing) setForm(EMPTY)
+      if (!isEditing) { setForm(EMPTY); draft.clear() }
       router.refresh()
       onSuccess?.()
     } else {

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { cn, formatDate, formatTime, formatQuantity } from '@/lib/utils'
 import { AreaCell } from './AreaCell'
 import { ImplementAdjustmentForm } from './ImplementAdjustmentForm'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { mutationQueue } from '@/lib/mutationQueue'
 
 // ─── types ──────────────────────────────────────────────────────────────────
 
@@ -383,6 +385,7 @@ function AdjustmentCard({
   talhaoId: string
 }) {
   const router = useRouter()
+  const isOnline = useOnlineStatus()
   const [expanded, setExpanded] = useState(isLatest)
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -422,6 +425,32 @@ function AdjustmentCard({
   async function handleDelete() {
     setDeleting(true)
     setDeleteError('')
+
+    // Offline: enfileira DELETE — sera drenado ao reconectar
+    if (!isOnline) {
+      try {
+        mutationQueue.add({
+          entity: 'implement_adjustment',
+          op: 'DELETE',
+          endpoint: `/api/farms/${farmId}/implement-adjustments/${adj.id}`,
+          payload: {},
+          target_id: adj.id,
+        })
+        setDeleting(false)
+        router.refresh()
+      } catch (e) {
+        setDeleting(false)
+        if (e instanceof Error && e.message === 'STORAGE_FULL') {
+          setDeleteError('Armazenamento local cheio. Conecte-se à internet.')
+        } else {
+          setDeleteError('Falha ao salvar localmente.')
+        }
+        setConfirmDelete(false)
+      }
+      return
+    }
+
+    // Online: deleta direto
     const res = await fetch(`/api/farms/${farmId}/implement-adjustments/${adj.id}`, {
       method: 'DELETE',
     })

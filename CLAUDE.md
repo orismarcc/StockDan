@@ -1,6 +1,12 @@
 @AGENTS.md
+@docs/DEVELOPMENT-STANDARDS.md
 
 # StockDan — Instruções para Claude
+
+> **OBRIGATÓRIO:** antes de qualquer implementação, ler e seguir `docs/DEVELOPMENT-STANDARDS.md`
+> (importado acima). Define padrões offline-first, idempotency, multi-user reconciliation,
+> templates de API/Form/Migration e checklists de pre/post-commit. Implementação que viola
+> esses padrões será retrabalho.
 
 ## Regra de Deploy Automático
 

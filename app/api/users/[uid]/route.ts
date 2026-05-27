@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { getActiveSession } from '@/lib/auth'
+import { getActiveSession, invalidateTokenVersionCache } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { parseBody } from '@/lib/utils'
 
@@ -58,6 +58,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
   const { name, role, password, farm_ids } = body
 
+  // Busca role+token_version atuais para detectar mudanca de cargo
+  const { data: current } = await supabase
+    .from('users')
+    .select('role, token_version')
+    .eq('id', uid)
+    .single()
+  const roleChanged = role && role !== current?.role
+
   const updates: Record<string, unknown> = {}
   if (name) updates.name = name
   if (role && ['admin', 'operario'].includes(role)) updates.role = role
@@ -68,10 +76,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
     updates.password_hash = await bcrypt.hash(password, 10)
     updates.must_change_password = false
   }
+  // [SESSION-INVALIDATION] Quando cargo muda, incrementa token_version do usuario.
+  // verifyToken vai rejeitar JWTs antigos (com tv menor) na proxima requisicao,
+  // forcando logout imediato. Sem isso, demote admin->operario nao tira privilegios
+  // por ate 7d (TTL do JWT).
+  if (roleChanged) {
+    updates.token_version = (current?.token_version ?? 0) + 1
+  }
 
   if (Object.keys(updates).length > 0) {
     const { error } = await supabase.from('users').update(updates).eq('id', uid)
     if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
+    // Invalida cache de token_version imediatamente para revogacao instantanea
+    if (roleChanged) invalidateTokenVersionCache(uid)
   }
 
   if (Array.isArray(farm_ids)) {

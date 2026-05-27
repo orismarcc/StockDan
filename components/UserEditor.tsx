@@ -25,6 +25,8 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState('')
 
+  const roleChanged = role !== user.role
+
   function toggleFarm(id: string) {
     setFarms((prev) =>
       prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
@@ -51,7 +53,11 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
     setSaving(false)
 
     if (!res.ok) { setError(data.error); return }
-    setSuccess('Alterações salvas com sucesso.')
+    setSuccess(
+      roleChanged
+        ? `Cargo alterado para ${role === 'admin' ? 'Administrador' : 'Operador'}. O usuário precisará fazer login novamente para que a mudança tenha efeito.`
+        : 'Alterações salvas com sucesso.'
+    )
     setPassword('')
     router.refresh()
   }
@@ -74,15 +80,24 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
         <h2 className="mb-5 text-sm font-semibold text-gray-400 uppercase tracking-wider">Dados do Usuário</h2>
         <form onSubmit={handleSave} className="flex flex-col gap-5">
           <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Select
-            label="Perfil"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            disabled={user.id === currentUserId}
-          >
-            <option value="operario">Operador</option>
-            <option value="admin">Administrador</option>
-          </Select>
+          <div>
+            <Select
+              label="Cargo"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              disabled={user.id === currentUserId}
+              hint={
+                user.id === currentUserId
+                  ? 'Você não pode alterar seu próprio cargo.'
+                  : roleChanged
+                  ? `Será alterado de ${user.role === 'admin' ? 'Administrador' : 'Operador'} para ${role === 'admin' ? 'Administrador' : 'Operador'}. O usuário precisará relogar.`
+                  : 'Administrador gerencia fazendas, insumos e usuários. Operador apenas registra retiradas.'
+              }
+            >
+              <option value="operario">Operador</option>
+              <option value="admin">Administrador</option>
+            </Select>
+          </div>
           <Input
             label="Nova Senha"
             type="password"

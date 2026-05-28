@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { formatDate, formatTime, formatQuantity } from '@/lib/utils'
+import { can } from '@/lib/permissions'
 
 export interface Transaction {
   id: string
@@ -40,8 +41,8 @@ export function TransactionTable({
   const [deleteError, setDeleteError] = useState('')
   const [page, setPage] = useState(0)
 
-  // canEdit: Gestor, Admin, Agrônomo podem editar/excluir transações (operário não)
-  const canEdit = !!userRole && userRole !== 'operario' && farmId && (onEdit || onDelete)
+  // canEdit: quem tem transaction.edit ou transaction.delete pode ver ações
+  const canEdit = !!userRole && can(userRole, 'transaction.edit') && farmId && (onEdit || onDelete)
   const totalPages = Math.ceil(transactions.length / pageSize)
   const paginated = transactions.slice(page * pageSize, (page + 1) * pageSize)
 

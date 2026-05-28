@@ -2,6 +2,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { can } from '@/lib/permissions'
 import { AnaliseClient } from './AnaliseClient'
 import type { AnaliseData } from './types'
 
@@ -10,6 +11,7 @@ export const metadata = { title: 'Análise' }
 export default async function AnalisePage() {
   const session = await getSession()
   if (!session) redirect('/login')
+  if (!can(session.role, 'analysis.view')) redirect('/dashboard')
 
   const supabase = createServerClient()
 

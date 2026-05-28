@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { checkFarmAccess } from '@/lib/farmAccess'
 import { WithdrawalForm } from '@/components/WithdrawalForm'
 import Link from 'next/link'
 
@@ -19,6 +20,8 @@ export default async function RetiradaPage({
   const { id } = await params
   const { talhao: initialTalhaoId } = await searchParams
   const supabase = createServerClient()
+
+  if (!(await checkFarmAccess(supabase, session, id))) redirect('/dashboard')
 
   const [{ data: farm }, { data: insumos }, { data: talhoes }, { data: txArea }] = await Promise.all([
     supabase.from('farms').select('id, name').eq('id', id).single(),

@@ -116,7 +116,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
         <div>
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm text-gray-500">{talhoes.length} talhão(ões) cadastrado(s)</p>
-            {userRole !== 'operario' && (
+            {can(userRole, 'talhao.write') && (
               <Link href={`/farms/${farm.id}/talhoes`}>
                 <Button size="sm">
                   <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -132,7 +132,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <EmptyState
               icon="map"
               message="Nenhum talhão cadastrado"
-              action={userRole !== 'operario' ? { label: 'Gerenciar talhões', href: `/farms/${farm.id}/talhoes` } : undefined}
+              action={can(userRole, 'talhao.write') ? { label: 'Gerenciar talhões', href: `/farms/${farm.id}/talhoes` } : undefined}
             />
           ) : (
             <>
@@ -195,7 +195,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <p className="text-sm text-gray-500">
               {insumos.length} insumo{insumos.length !== 1 ? 's' : ''} cadastrado{insumos.length !== 1 ? 's' : ''}
             </p>
-            {userRole !== 'operario' && (
+            {can(userRole, 'insumo.write') && (
               <Link href={`/farms/${farm.id}/insumos/new`}>
                 <Button size="sm">
                   <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -211,7 +211,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <EmptyState
               icon="box"
               message="Nenhum insumo cadastrado"
-              action={userRole !== 'operario' ? { label: 'Cadastrar insumo', href: `/farms/${farm.id}/insumos/new` } : undefined}
+              action={can(userRole, 'insumo.write') ? { label: 'Cadastrar insumo', href: `/farms/${farm.id}/insumos/new` } : undefined}
             />
           ) : (
             <>
@@ -555,25 +555,25 @@ const InsumoRow = memo(function InsumoRow({
       </td>
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-2 flex-wrap">
-          {userRole !== 'operario' && (
-            <>
-              <button
-                onClick={onAddStock}
-                className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 hover:border-green-500/50 hover:bg-green-500/20 transition-colors whitespace-nowrap"
-              >
-                + Estoque
-              </button>
-              <button
-                onClick={onEditQty}
-                title="Ajustar quantidade"
-                className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2 py-1 text-xs text-gray-400 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-200 transition-colors"
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                </svg>
-                Ajustar
-              </button>
-            </>
+          {can(userRole, 'transaction.entrada') && (
+            <button
+              onClick={onAddStock}
+              className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 hover:border-green-500/50 hover:bg-green-500/20 transition-colors whitespace-nowrap"
+            >
+              + Estoque
+            </button>
+          )}
+          {can(userRole, 'adjustment.write') && (
+            <button
+              onClick={onEditQty}
+              title="Ajustar quantidade"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2 py-1 text-xs text-gray-400 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              </svg>
+              Ajustar
+            </button>
           )}
           <Link
             href={`/farms/${farmId}/insumos/${ins.id}`}
@@ -633,24 +633,24 @@ const InsumoCard = memo(function InsumoCard({
       </div>
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">
-        {userRole !== 'operario' && (
-          <>
-            <button
-              onClick={onAddStock}
-              className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm font-medium text-green-400 hover:bg-green-500/20 transition-colors"
-            >
-              + Estoque
-            </button>
-            <button
-              onClick={onEditQty}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
-            >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-              </svg>
-              Ajustar
-            </button>
-          </>
+        {can(userRole, 'transaction.entrada') && (
+          <button
+            onClick={onAddStock}
+            className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+          >
+            + Estoque
+          </button>
+        )}
+        {can(userRole, 'adjustment.write') && (
+          <button
+            onClick={onEditQty}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+            </svg>
+            Ajustar
+          </button>
         )}
         <Link
           href={`/farms/${farmId}/insumos/${ins.id}`}

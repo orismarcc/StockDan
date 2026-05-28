@@ -13,7 +13,7 @@ async function getFarmsWithStats(userId: string, role: string, gestorId: string)
 
   let farmsData: any[] = []
 
-  const FARM_FIELDS = 'id, name, farmer_name, city, state, created_at, updated_at'
+  const FARM_FIELDS = 'id, name, farmer_name, city, state, created_at'
 
   if (role === 'gestor') {
     const { data } = await supabase

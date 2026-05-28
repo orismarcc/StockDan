@@ -11,7 +11,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-const FARM_FIELDS = 'id, name, farmer_name, city, state, created_at, updated_at'
+const FARM_FIELDS = 'id, name, farmer_name, city, state, created_at'
 
 export interface FarmSummary {
   id: string
@@ -20,7 +20,6 @@ export interface FarmSummary {
   city: string
   state: string
   created_at: string
-  updated_at: string
 }
 
 /**

@@ -13,7 +13,7 @@ const getFarm = cache(async (id: string) => {
   const supabase = createServerClient()
   const { data } = await supabase
     .from('farms')
-    .select('id, name, farmer_name, city, state, created_at, updated_at')
+    .select('id, name, farmer_name, city, state, created_at')
     .eq('id', id)
     .single()
   return data

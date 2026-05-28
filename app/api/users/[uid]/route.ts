@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { getActiveSession, invalidateTokenVersionCache } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { can, canManageUser, type Role } from '@/lib/permissions'
+import { logAudit } from '@/lib/audit'
 import { parseBody } from '@/lib/utils'
 import { isUUID } from '@/lib/validate'
 
@@ -187,7 +188,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const supabase = createServerClient()
   const { data: target } = await supabase
     .from('users')
-    .select('id, role, gestor_id')
+    .select('id, name, email, role, gestor_id')
     .eq('id', uid)
     .maybeSingle()
 
@@ -203,5 +204,14 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   }
   invalidateTokenVersionCache(uid)
+
+  await logAudit(supabase, session, {
+    action: 'delete',
+    entity: 'user',
+    entity_id: uid,
+    summary: `Excluiu usuário "${target.name}" (${target.email}, ${target.role})`,
+    changes: { before: { name: target.name, email: target.email, role: target.role } },
+  })
+
   return NextResponse.json({ ok: true })
 }

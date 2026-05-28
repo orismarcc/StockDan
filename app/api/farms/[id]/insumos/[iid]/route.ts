@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { can } from '@/lib/permissions'
+import { logAudit } from '@/lib/audit'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
 import { trimField, isValidQuantity, withinLength } from '@/lib/validate'
@@ -142,6 +143,13 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
+  const { data: snap } = await supabase
+    .from('insumos')
+    .select('title, quantity, unit')
+    .eq('id', iid)
+    .eq('farm_id', farm_id)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('insumos')
     .delete()
@@ -149,5 +157,15 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .eq('farm_id', farm_id)
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
+
+  await logAudit(supabase, session, {
+    action: 'delete',
+    entity: 'insumo',
+    entity_id: iid,
+    farm_id,
+    summary: snap ? `Excluiu insumo "${snap.title}" (estoque restante: ${snap.quantity} ${snap.unit})` : `Excluiu insumo`,
+    changes: snap ? { before: snap } : undefined,
+  })
+
   return NextResponse.json({ ok: true })
 }

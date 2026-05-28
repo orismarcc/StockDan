@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { can } from '@/lib/permissions'
+import { logAudit } from '@/lib/audit'
 import { parseBody } from '@/lib/utils'
 
 type Params = { params: Promise<{ id: string }> }
@@ -114,9 +115,26 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     )
   }
 
+  const { data: snap } = await supabase
+    .from('farms')
+    .select('name, city, state')
+    .eq('id', id)
+    .maybeSingle()
+
   const { error } = await supabase.from('farms').delete().eq('id', id)
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
+
+  await logAudit(supabase, session, {
+    action: 'delete',
+    entity: 'farm',
+    entity_id: id,
+    summary: snap
+      ? `Excluiu fazenda "${snap.name}" (${snap.city}, ${snap.state}) — ${transactionCount} transação(ões) removidas em cascata`
+      : `Excluiu fazenda`,
+    changes: snap ? { before: { ...snap, deletedTransactions: transactionCount } } : { deletedTransactions: transactionCount },
+  })
+
   return NextResponse.json({
     ok: true,
     ...(transactionCount > 0 && { deletedTransactions: transactionCount }),

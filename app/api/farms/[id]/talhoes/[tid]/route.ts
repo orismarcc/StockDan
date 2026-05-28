@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { can } from '@/lib/permissions'
+import { logAudit } from '@/lib/audit'
 import { parseBody } from '@/lib/utils'
 import { trimField, isValidAreaHa, withinLength } from '@/lib/validate'
 
@@ -73,6 +74,14 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
+  // Snapshot ANTES de deletar (para o audit log)
+  const { data: snap } = await supabase
+    .from('talhoes')
+    .select('name, area_ha')
+    .eq('id', tid)
+    .eq('farm_id', farm_id)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('talhoes')
     .delete()
@@ -80,5 +89,15 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .eq('farm_id', farm_id)
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
+
+  await logAudit(supabase, session, {
+    action: 'delete',
+    entity: 'talhao',
+    entity_id: tid,
+    farm_id,
+    summary: snap ? `Excluiu talhão "${snap.name}" (${Number(snap.area_ha).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ha)` : `Excluiu talhão`,
+    changes: snap ? { before: snap } : undefined,
+  })
+
   return NextResponse.json({ ok: true })
 }

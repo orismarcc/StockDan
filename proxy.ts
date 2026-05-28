@@ -60,10 +60,10 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL('/change-password', req.url))
   }
 
-  // Rotas exclusivas de admin
+  // Rotas exclusivas de gestor/admin (gestor é o papel de nível mais alto desde RH-1)
   const adminOnlyPaths = ['/admin', '/farms/new', '/api/users']
   const isAdminOnly = adminOnlyPaths.some((p) => pathname.startsWith(p))
-  if (isAdminOnly && user.role !== 'admin') {
+  if (isAdminOnly && user.role !== 'admin' && user.role !== 'gestor') {
     if (isApiRoute) {
       return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
     }

@@ -116,7 +116,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
         <div>
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm text-gray-500">{talhoes.length} talhão(ões) cadastrado(s)</p>
-            {userRole === 'admin' && (
+            {userRole !== 'operario' && (
               <Link href={`/farms/${farm.id}/talhoes`}>
                 <Button size="sm">
                   <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -132,7 +132,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <EmptyState
               icon="map"
               message="Nenhum talhão cadastrado"
-              action={userRole === 'admin' ? { label: 'Gerenciar talhões', href: `/farms/${farm.id}/talhoes` } : undefined}
+              action={userRole !== 'operario' ? { label: 'Gerenciar talhões', href: `/farms/${farm.id}/talhoes` } : undefined}
             />
           ) : (
             <>
@@ -195,7 +195,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <p className="text-sm text-gray-500">
               {insumos.length} insumo{insumos.length !== 1 ? 's' : ''} cadastrado{insumos.length !== 1 ? 's' : ''}
             </p>
-            {userRole === 'admin' && (
+            {userRole !== 'operario' && (
               <Link href={`/farms/${farm.id}/insumos/new`}>
                 <Button size="sm">
                   <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -211,7 +211,7 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
             <EmptyState
               icon="box"
               message="Nenhum insumo cadastrado"
-              action={userRole === 'admin' ? { label: 'Cadastrar insumo', href: `/farms/${farm.id}/insumos/new` } : undefined}
+              action={userRole !== 'operario' ? { label: 'Cadastrar insumo', href: `/farms/${farm.id}/insumos/new` } : undefined}
             />
           ) : (
             <>
@@ -402,7 +402,7 @@ const TalhaoRow = memo(function TalhaoRow({
           >
             Detalhes
           </Link>
-          {userRole === 'admin' && (
+          {userRole !== 'operario' && (
             <ConfirmDeleteButton
               onConfirm={async () => {
                 const res = await fetch(`/api/farms/${farmId}/talhoes/${t.id}`, { method: 'DELETE' })
@@ -504,7 +504,7 @@ const TalhaoCard = memo(function TalhaoCard({
           >
             Detalhes
           </Link>
-          {userRole === 'admin' && (
+          {userRole !== 'operario' && (
             <ConfirmDeleteButton
               onConfirm={async () => {
                 const res = await fetch(`/api/farms/${farmId}/talhoes/${t.id}`, { method: 'DELETE' })
@@ -555,7 +555,7 @@ const InsumoRow = memo(function InsumoRow({
       </td>
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-2 flex-wrap">
-          {userRole === 'admin' && (
+          {userRole !== 'operario' && (
             <>
               <button
                 onClick={onAddStock}
@@ -581,7 +581,7 @@ const InsumoRow = memo(function InsumoRow({
           >
             Detalhe
           </Link>
-          {userRole === 'admin' && (
+          {userRole !== 'operario' && (
             <ConfirmDeleteButton
               onConfirm={async () => {
                 const res = await fetch(`/api/farms/${farmId}/insumos/${ins.id}`, { method: 'DELETE' })
@@ -633,7 +633,7 @@ const InsumoCard = memo(function InsumoCard({
       </div>
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">
-        {userRole === 'admin' && (
+        {userRole !== 'operario' && (
           <>
             <button
               onClick={onAddStock}
@@ -658,7 +658,7 @@ const InsumoCard = memo(function InsumoCard({
         >
           Detalhe
         </Link>
-        {userRole === 'admin' && (
+        {userRole !== 'operario' && (
           <ConfirmDeleteButton
             onConfirm={async () => {
               const res = await fetch(`/api/farms/${farmId}/insumos/${ins.id}`, { method: 'DELETE' })

@@ -4,15 +4,16 @@ import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { FarmCard } from '@/components/FarmCard'
 import { Button } from '@/components/ui/Button'
+import { can } from '@/lib/permissions'
 
 export const metadata = { title: 'Dashboard' }
 
-async function getFarmsWithStats(userId: string, role: string) {
+async function getFarmsWithStats(userId: string, role: string, gestorId: string) {
   const supabase = createServerClient()
 
   let farmsData: any[] = []
 
-  if (role === 'admin') {
+  if (role === 'gestor') {
     const { data } = await supabase
       .from('farms')
       .select('*')
@@ -20,10 +21,12 @@ async function getFarmsWithStats(userId: string, role: string) {
       .order('name')
     farmsData = data ?? []
   } else {
+    // Admin/Agrônomo/Operário: fazendas vinculadas via farm_users, dentro do tenant
     const { data } = await supabase
       .from('farm_users')
-      .select('farms(*)')
+      .select('farms!inner(*)')
       .eq('user_id', userId)
+      .eq('farms.owner_id', gestorId)
     farmsData = (data ?? []).map((r: any) => r.farms).filter(Boolean)
   }
 
@@ -77,7 +80,7 @@ export default async function DashboardPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const farms = await getFarmsWithStats(session.id, session.role)
+  const farms = await getFarmsWithStats(session.id, session.role, session.gestor_id)
 
   return (
     <div>
@@ -89,7 +92,7 @@ export default async function DashboardPage() {
             {farms.length} fazenda{farms.length !== 1 ? 's' : ''} cadastrada{farms.length !== 1 ? 's' : ''}
           </p>
         </div>
-        {session.role === 'admin' && (
+        {can(session.role, 'farm.create') && (
           <Link href="/farms/new" className="self-start sm:self-auto">
             <Button>
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -110,7 +113,7 @@ export default async function DashboardPage() {
             </svg>
           </div>
           <p className="mt-4 text-sm font-medium text-gray-400">Nenhuma fazenda cadastrada</p>
-          {session.role === 'admin' && (
+          {can(session.role, 'farm.create') && (
             <Link href="/farms/new" className="mt-3">
               <Button size="sm" variant="secondary">Cadastrar primeira fazenda</Button>
             </Link>

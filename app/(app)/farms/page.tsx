@@ -4,21 +4,24 @@ import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { FarmCard } from '@/components/FarmCard'
 import { Button } from '@/components/ui/Button'
+import { can } from '@/lib/permissions'
 
 export const metadata = { title: 'Fazendas' }
 
-async function getFarmsWithStats(userId: string, role: string) {
+async function getFarmsWithStats(userId: string, role: string, gestorId: string) {
   const supabase = createServerClient()
   let farmsData: any[] = []
 
-  if (role === 'admin') {
+  if (role === 'gestor') {
     const { data } = await supabase.from('farms').select('*').eq('owner_id', userId).order('name')
     farmsData = data ?? []
   } else {
+    // Admin/Agrônomo/Operário: fazendas vinculadas via farm_users, dentro do tenant
     const { data } = await supabase
       .from('farm_users')
-      .select('farms(*)')
+      .select('farms!inner(*)')
       .eq('user_id', userId)
+      .eq('farms.owner_id', gestorId)
     farmsData = (data ?? []).map((r: any) => r.farms).filter(Boolean)
   }
 
@@ -64,7 +67,7 @@ export default async function FarmsPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const farms = await getFarmsWithStats(session.id, session.role)
+  const farms = await getFarmsWithStats(session.id, session.role, session.gestor_id)
 
   return (
     <div>
@@ -77,7 +80,7 @@ export default async function FarmsPage() {
               : `${farms.length} fazenda${farms.length !== 1 ? 's' : ''} cadastrada${farms.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        {session.role === 'admin' && (
+        {can(session.role, 'farm.create') && (
           <Link href="/farms/new" className="self-start sm:self-auto">
             <Button>
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -98,7 +101,7 @@ export default async function FarmsPage() {
           </div>
           <p className="mt-4 text-sm font-medium text-gray-400">Nenhuma fazenda cadastrada ainda</p>
           <p className="mt-1 text-xs text-gray-600">Adicione a primeira fazenda para começar a gerenciar insumos.</p>
-          {session.role === 'admin' && (
+          {can(session.role, 'farm.create') && (
             <Link href="/farms/new" className="mt-4">
               <Button>Cadastrar primeira fazenda</Button>
             </Link>

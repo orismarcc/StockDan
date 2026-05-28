@@ -7,6 +7,7 @@ import { formatQuantity } from '@/lib/utils'
 import { StockBadge } from '@/components/StockBadge'
 import { TransactionTable } from '@/components/TransactionTable'
 import { InsumoActions } from '@/components/InsumoActions'
+import { can } from '@/lib/permissions'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; iid: string }> }) {
   const session = await getSession()
@@ -70,7 +71,7 @@ export default async function InsumoDetailPage({
               <p className="mt-1 text-sm text-gray-500">{insumo.description}</p>
             )}
           </div>
-          {session.role === 'admin' && (
+          {can(session.role, 'transaction.entrada') && (
             <div className="shrink-0">
               <InsumoActions farmId={farmId} insumo={insumo} />
             </div>

@@ -6,6 +6,7 @@ import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { FarmTabs } from '@/components/FarmTabs'
 import { DeleteFarmButton } from '@/components/DeleteFarmButton'
+import { can } from '@/lib/permissions'
 
 // Deduplica a query de farm entre generateMetadata e FarmPage no mesmo request
 const getFarm = cache(async (id: string) => {
@@ -68,19 +69,21 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
           </p>
         </div>
 
-        {/* Ações (somente admin) */}
-        {session.role === 'admin' && (
+        {/* Ações por cargo (Editar: Gestor/Admin/Agrônomo; Excluir: Gestor/Admin) */}
+        {(can(session.role, 'farm.edit') || can(session.role, 'farm.delete')) && (
           <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-            <Link href={`/farms/${id}/edit`}>
-              <button className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 sm:py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors">
-                <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
-                  <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
-                </svg>
-                Editar
-              </button>
-            </Link>
-            <DeleteFarmButton farmId={id} />
+            {can(session.role, 'farm.edit') && (
+              <Link href={`/farms/${id}/edit`}>
+                <button className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 sm:py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors">
+                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
+                    <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
+                  </svg>
+                  Editar
+                </button>
+              </Link>
+            )}
+            {can(session.role, 'farm.delete') && <DeleteFarmButton farmId={id} />}
           </div>
         )}
       </div>

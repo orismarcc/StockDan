@@ -17,7 +17,7 @@ export default async function AnalisePage() {
   let farmIds: string[] = []
   let farms: { id: string; name: string }[] = []
 
-  if (session.role === 'admin') {
+  if (session.role === 'gestor') {
     const { data } = await supabase
       .from('farms')
       .select('id, name')
@@ -26,10 +26,12 @@ export default async function AnalisePage() {
     farms = data ?? []
     farmIds = farms.map((f) => f.id)
   } else {
+    // Admin/Agrônomo/Operário: fazendas vinculadas, dentro do tenant
     const { data } = await supabase
       .from('farm_users')
-      .select('farms(id, name)')
+      .select('farms!inner(id, name, owner_id)')
       .eq('user_id', session.id)
+      .eq('farms.owner_id', session.gestor_id)
     farms = ((data ?? []).map((r: any) => r.farms).filter(Boolean) as { id: string; name: string }[])
     farmIds = farms.map((f) => f.id)
   }

@@ -42,6 +42,9 @@ export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProp
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
+    // Clear per-user client caches so a subsequent login doesn't see stale data
+    localStorage.removeItem('insumoCache')
+    localStorage.removeItem('stockdan_queue')
     router.push('/login')
     router.refresh()
   }

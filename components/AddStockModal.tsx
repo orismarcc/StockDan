@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Modal } from './ui/Modal'
 import { Input } from './ui/Input'
 import { Textarea } from './ui/Textarea'
@@ -23,6 +24,7 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const submittingRef           = useRef(false)
+  const router                  = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -47,6 +49,7 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
     setLoading(false)
     submittingRef.current = false
 
+    if (res.status === 401) { router.push('/login'); return }
     if (!res.ok) { setError(data.error); return }
     onSuccess()
   }

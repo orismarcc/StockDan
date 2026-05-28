@@ -11,7 +11,7 @@ export interface SyncResult {
   rejected: { item: import('@/lib/offlineQueue').QueueItem; reason: string }[]
 }
 
-const PERMANENT_ERRORS = [400, 401, 403, 404]
+const PERMANENT_ERRORS = [400, 403, 404]
 const FETCH_TIMEOUT_MS = 15_000
 
 async function verifyConnectivity(): Promise<boolean> {
@@ -84,12 +84,18 @@ export function useSyncQueue() {
             offlineQueue.remove(item.id)
             synced++
             syncLock.renew() // extend TTL so lock doesn't expire on long syncs
+          } else if (res.status === 401) {
+            // Sessão expirada — limpa a fila inteira e redireciona
+            offlineQueue.clear()
+            localStorage.removeItem('insumoCache')
+            syncLock.release()
+            router.push('/login')
+            return { synced, rejected }
           } else if (res.status === 422 || PERMANENT_ERRORS.includes(res.status)) {
             // [OFFLINE-6] Erros permanentes: descartar imediatamente sem gastar retries
             const body = await res.json().catch(() => ({}))
             offlineQueue.remove(item.id)
             const reason =
-              res.status === 401 ? 'Sessão expirada. Faça login novamente.' :
               res.status === 403 ? 'Sem permissão para esta operação.' :
               res.status === 404 ? 'Insumo ou talhão não encontrado (pode ter sido excluído).' :
               body.error ?? 'Dados inválidos.'

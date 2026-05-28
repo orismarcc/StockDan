@@ -97,43 +97,45 @@ export async function GET(req: NextRequest) {
       .map(t => [t.user_id as string, t.users![0].name])
   )
 
+  // ─── Shared aggregation (used by both PDF and XLSX) ──────────────────────────
+  type AggEntry = { qty: number; area: number; count: number }
+
+  const totalKg   = txs.reduce((s, t) => s + Number(t.quantity), 0)
+  const totalArea = txs.filter(t => t.area_ha && t.area_ha > 0).reduce((s, t) => s + Number(t.area_ha), 0)
+  const avgKgHa   = totalArea > 0 ? totalKg / totalArea : null
+
+  const byInsumo: Record<string, AggEntry> = {}
+  for (const t of txs) {
+    if (!byInsumo[t.insumo_id]) byInsumo[t.insumo_id] = { qty: 0, area: 0, count: 0 }
+    byInsumo[t.insumo_id].qty   += Number(t.quantity)
+    byInsumo[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+    byInsumo[t.insumo_id].count += 1
+  }
+
+  const byTalhao: Record<string, AggEntry> = {}
+  for (const t of txs) {
+    if (!t.talhao_id) continue
+    if (!byTalhao[t.talhao_id]) byTalhao[t.talhao_id] = { qty: 0, area: 0, count: 0 }
+    byTalhao[t.talhao_id].qty   += Number(t.quantity)
+    byTalhao[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+    byTalhao[t.talhao_id].count += 1
+  }
+
+  const byUser: Record<string, AggEntry> = {}
+  for (const t of txs) {
+    const uid = t.user_id ?? '__unknown__'
+    if (!byUser[uid]) byUser[uid] = { qty: 0, area: 0, count: 0 }
+    byUser[uid].qty   += Number(t.quantity)
+    byUser[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+    byUser[uid].count += 1
+  }
+
   // ─── PDF ────────────────────────────────────────────────────────────────────
   if (format === 'pdf') {
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
       import('jspdf'),
       import('jspdf-autotable'),
     ])
-
-    // ── Aggregates ─────────────────────────────────────────────────────────
-    const totalKg   = txs.reduce((s, t) => s + Number(t.quantity), 0)
-    const totalArea = txs.filter(t => t.area_ha && t.area_ha > 0).reduce((s, t) => s + Number(t.area_ha), 0)
-    const avgKgHa   = totalArea > 0 ? totalKg / totalArea : null
-
-    const byInsumo: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      if (!byInsumo[t.insumo_id]) byInsumo[t.insumo_id] = { qty: 0, area: 0, count: 0 }
-      byInsumo[t.insumo_id].qty   += Number(t.quantity)
-      byInsumo[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byInsumo[t.insumo_id].count += 1
-    }
-
-    const byTalhao: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      if (!t.talhao_id) continue
-      if (!byTalhao[t.talhao_id]) byTalhao[t.talhao_id] = { qty: 0, area: 0, count: 0 }
-      byTalhao[t.talhao_id].qty   += Number(t.quantity)
-      byTalhao[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byTalhao[t.talhao_id].count += 1
-    }
-
-    const byUser: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      const uid = t.user_id ?? '__unknown__'
-      if (!byUser[uid]) byUser[uid] = { qty: 0, area: 0, count: 0 }
-      byUser[uid].qty   += Number(t.quantity)
-      byUser[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byUser[uid].count += 1
-    }
 
     // ── Setup ──────────────────────────────────────────────────────────────
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
@@ -642,18 +644,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (sections.includes('by_insumo')) {
-    const byInsumo2: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      if (!byInsumo2[t.insumo_id]) byInsumo2[t.insumo_id] = { qty: 0, area: 0, count: 0 }
-      byInsumo2[t.insumo_id].qty   += Number(t.quantity)
-      byInsumo2[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byInsumo2[t.insumo_id].count += 1
-    }
-    const totalKgXlsx = Object.values(byInsumo2).reduce((s, d) => s + d.qty, 0)
-    const rows = Object.entries(byInsumo2)
+    const totalKgXlsx = Object.values(byInsumo).reduce((s, d) => s + d.qty, 0)
+    const rows = Object.entries(byInsumo)
       .sort(([, a], [, b]) => b.qty - a.qty)
       .map(([id, { qty, area, count }]) => ({
-        Insumo:              insumoMap[id] ?? id,
+        Insumo: insumoMap[id] ?? id,
         Aplicações:          count,
         'Total (kg)':        qty,
         'Área total (ha)':   area || null,
@@ -666,15 +661,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (sections.includes('by_talhao')) {
-    const byTalhao2: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      if (!t.talhao_id) continue
-      if (!byTalhao2[t.talhao_id]) byTalhao2[t.talhao_id] = { qty: 0, area: 0, count: 0 }
-      byTalhao2[t.talhao_id].qty   += Number(t.quantity)
-      byTalhao2[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byTalhao2[t.talhao_id].count += 1
-    }
-    const rows = Object.entries(byTalhao2)
+    const rows = Object.entries(byTalhao)
       .sort(([, a], [, b]) => b.qty - a.qty)
       .map(([id, { qty, area, count }]) => {
         const talhao  = talhaoMap[id]
@@ -695,16 +682,8 @@ export async function GET(req: NextRequest) {
   }
 
   if (sections.includes('operators')) {
-    const byUser2: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      const uid = t.user_id ?? '__unknown__'
-      if (!byUser2[uid]) byUser2[uid] = { qty: 0, area: 0, count: 0 }
-      byUser2[uid].qty   += Number(t.quantity)
-      byUser2[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byUser2[uid].count += 1
-    }
-    const totalKgXlsx = Object.values(byUser2).reduce((s, d) => s + d.qty, 0)
-    const rows = Object.entries(byUser2)
+    const totalKgXlsx = Object.values(byUser).reduce((s, d) => s + d.qty, 0)
+    const rows = Object.entries(byUser)
       .sort(([, a], [, b]) => b.qty - a.qty)
       .map(([uid, { qty, area, count }]) => ({
         Operador:               userMap[uid] ?? 'Desconhecido',

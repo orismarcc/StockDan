@@ -34,11 +34,19 @@ function write(items: QueueItem[]) {
 }
 
 const MAX_RETRIES = 5
+const ITEM_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 export const offlineQueue = {
   MAX_RETRIES,
 
-  getAll: read,
+  getAll(): QueueItem[] {
+    const now = Date.now()
+    const items = read()
+    const fresh = items.filter((i) => now - new Date(i.created_at).getTime() < ITEM_TTL_MS)
+    // Persist if any expired items were dropped
+    if (fresh.length !== items.length) write(fresh)
+    return fresh
+  },
 
   add(item: Omit<QueueItem, 'id' | 'created_at' | 'retries'>): QueueItem {
     const full: QueueItem = {
@@ -69,6 +77,10 @@ export const offlineQueue = {
   },
 
   count(): number {
-    return read().length
+    return this.getAll().length
+  },
+
+  clear() {
+    write([])
   },
 }

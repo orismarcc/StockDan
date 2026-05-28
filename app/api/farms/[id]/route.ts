@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
+import { trimField, withinLength } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -42,10 +43,22 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const body = await parseBody<{ name?: string; city?: string; state?: string; farmer_name?: string }>(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
-  const { name, city, state, farmer_name } = body
+  const name        = trimField(body.name)
+  const city        = trimField(body.city)
+  const state       = trimField(body.state)
+  const farmer_name = trimField(body.farmer_name)
 
   if (!name || !city || !state || !farmer_name) {
     return NextResponse.json({ error: 'Preencha todos os campos.' }, { status: 400 })
+  }
+  if (!withinLength(name, 120)) {
+    return NextResponse.json({ error: 'Nome da fazenda excede 120 caracteres.' }, { status: 400 })
+  }
+  if (!withinLength(farmer_name, 120)) {
+    return NextResponse.json({ error: 'Nome do produtor excede 120 caracteres.' }, { status: 400 })
+  }
+  if (!withinLength(city, 80)) {
+    return NextResponse.json({ error: 'Nome da cidade excede 80 caracteres.' }, { status: 400 })
   }
 
   const { data, error } = await supabase

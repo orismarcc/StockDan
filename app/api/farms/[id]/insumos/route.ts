@@ -57,6 +57,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!withinLength(title, 120)) {
     return NextResponse.json({ error: 'Nome do insumo excede 120 caracteres.' }, { status: 400 })
   }
+  if (description && !withinLength(description, 500)) {
+    return NextResponse.json({ error: 'Descrição excede 500 caracteres.' }, { status: 400 })
+  }
   if (unit !== 'kg') {
     return NextResponse.json({ error: 'Unidade inválida. Use kg.' }, { status: 400 })
   }

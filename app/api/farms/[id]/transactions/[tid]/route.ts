@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { error } = await supabase
       .from('transactions')
-      .update({ area_ha: ha })
+      .update({ area_ha })
       .eq('id', tid)
       .eq('farm_id', farm_id)
 

@@ -43,6 +43,9 @@ export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProp
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
+    // Limpa caches locais para que próximo login não veja dados do usuário anterior
+    localStorage.removeItem('insumoCache')
+    localStorage.removeItem('stockdan_queue')
     router.push('/login')
     router.refresh()
   }

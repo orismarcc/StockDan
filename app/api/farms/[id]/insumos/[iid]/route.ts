@@ -101,7 +101,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (!withinLength(t, 120)) return NextResponse.json({ error: 'Nome excede 120 caracteres.' }, { status: 400 })
     updateData.title = t
   }
-  if (description !== undefined) updateData.description = trimField(description)
+  if (description !== undefined) {
+    const d = trimField(description)
+    if (d && !withinLength(d, 500)) {
+      return NextResponse.json({ error: 'Descrição excede 500 caracteres.' }, { status: 400 })
+    }
+    updateData.description = d
+  }
   if (min_quantity !== undefined) {
     const mq = min_quantity != null ? Number(min_quantity) : null
     if (mq !== null && (!Number.isFinite(mq) || mq < 0 || mq > 9_999_999)) {

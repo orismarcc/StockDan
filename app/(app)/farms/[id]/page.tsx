@@ -30,9 +30,11 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
   const { id } = await params
   const supabase = createServerClient()
 
-  if (!(await checkFarmAccess(supabase, session, id))) redirect('/dashboard')
-
-  const farm = await getFarm(id)
+  const [hasAccess, farm] = await Promise.all([
+    checkFarmAccess(supabase, session, id),
+    getFarm(id),
+  ])
+  if (!hasAccess) redirect('/dashboard')
   if (!farm) notFound()
 
   const [{ data: insumos }, { data: talhoes }, { data: transactions }] = await Promise.all([

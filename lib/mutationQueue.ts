@@ -132,4 +132,8 @@ export const mutationQueue = {
   pendingForTarget(entity: MutationEntity, targetId: string): MutationItem[] {
     return read().filter((i) => i.entity === entity && i.target_id === targetId)
   },
+
+  clear() {
+    write([])
+  },
 }

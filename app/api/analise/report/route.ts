@@ -112,43 +112,45 @@ export async function GET(req: NextRequest) {
       .map(t => [t.user_id as string, resolveName(t.users)!])
   )
 
+  // ─── Agregações compartilhadas (usadas tanto no PDF quanto no XLSX) ──────────
+  type AggEntry = { qty: number; area: number; count: number }
+
+  const totalKg   = txs.reduce((s, t) => s + Number(t.quantity), 0)
+  const totalArea = txs.filter(t => t.area_ha && t.area_ha > 0).reduce((s, t) => s + Number(t.area_ha), 0)
+  const avgKgHa   = totalArea > 0 ? totalKg / totalArea : null
+
+  const byInsumo: Record<string, AggEntry> = {}
+  for (const t of txs) {
+    if (!byInsumo[t.insumo_id]) byInsumo[t.insumo_id] = { qty: 0, area: 0, count: 0 }
+    byInsumo[t.insumo_id].qty   += Number(t.quantity)
+    byInsumo[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+    byInsumo[t.insumo_id].count += 1
+  }
+
+  const byTalhao: Record<string, AggEntry> = {}
+  for (const t of txs) {
+    if (!t.talhao_id) continue
+    if (!byTalhao[t.talhao_id]) byTalhao[t.talhao_id] = { qty: 0, area: 0, count: 0 }
+    byTalhao[t.talhao_id].qty   += Number(t.quantity)
+    byTalhao[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+    byTalhao[t.talhao_id].count += 1
+  }
+
+  const byUser: Record<string, AggEntry> = {}
+  for (const t of txs) {
+    const uid = t.user_id ?? '__unknown__'
+    if (!byUser[uid]) byUser[uid] = { qty: 0, area: 0, count: 0 }
+    byUser[uid].qty   += Number(t.quantity)
+    byUser[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+    byUser[uid].count += 1
+  }
+
   // ─── PDF ────────────────────────────────────────────────────────────────────
   if (format === 'pdf') {
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
       import('jspdf'),
       import('jspdf-autotable'),
     ])
-
-    // ── Aggregates ─────────────────────────────────────────────────────────
-    const totalKg   = txs.reduce((s, t) => s + Number(t.quantity), 0)
-    const totalArea = txs.filter(t => t.area_ha && t.area_ha > 0).reduce((s, t) => s + Number(t.area_ha), 0)
-    const avgKgHa   = totalArea > 0 ? totalKg / totalArea : null
-
-    const byInsumo: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      if (!byInsumo[t.insumo_id]) byInsumo[t.insumo_id] = { qty: 0, area: 0, count: 0 }
-      byInsumo[t.insumo_id].qty   += Number(t.quantity)
-      byInsumo[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byInsumo[t.insumo_id].count += 1
-    }
-
-    const byTalhao: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      if (!t.talhao_id) continue
-      if (!byTalhao[t.talhao_id]) byTalhao[t.talhao_id] = { qty: 0, area: 0, count: 0 }
-      byTalhao[t.talhao_id].qty   += Number(t.quantity)
-      byTalhao[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byTalhao[t.talhao_id].count += 1
-    }
-
-    const byUser: Record<string, { qty: number; area: number; count: number }> = {}
-    for (const t of txs) {
-      const uid = t.user_id ?? '__unknown__'
-      if (!byUser[uid]) byUser[uid] = { qty: 0, area: 0, count: 0 }
-      byUser[uid].qty   += Number(t.quantity)
-      byUser[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
-      byUser[uid].count += 1
-    }
 
     // ── Setup ──────────────────────────────────────────────────────────────
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })

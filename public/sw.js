@@ -114,7 +114,21 @@ self.addEventListener('fetch', (event) => {
       caches.open(CACHE).then((cache) =>
         fetch(request)
           .then((res) => {
-            if (res.ok) cache.put(request, res.clone()).catch(() => {})
+            // Não cacheia respostas 401 nem redirecionamentos para /login
+            const redirectedToLogin = res.url && res.url.includes('/login')
+            if (res.ok && !redirectedToLogin) {
+              cache.put(request, res.clone()).catch(() => {})
+            } else if (res.status === 401 || redirectedToLogin) {
+              // Limpa cache de páginas autenticadas para evitar servir
+              // conteúdo de outro usuário após logout/troca de conta
+              cache.keys().then((keys) =>
+                Promise.all(
+                  keys
+                    .filter((k) => !k.url.startsWith(self.location.origin + '/_next/'))
+                    .map((k) => cache.delete(k))
+                )
+              )
+            }
             return res
           })
           .catch(async () => {

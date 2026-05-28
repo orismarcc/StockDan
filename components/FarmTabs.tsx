@@ -697,6 +697,7 @@ function AdjustQuantityModal({
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
   const submittingRef = useRef(false)
+  const router = useRouter()
 
   const unitLabel = 'kg'
   const delta = Number(newQty) - currentQty
@@ -715,6 +716,7 @@ function AdjustQuantityModal({
     const data = await res.json().catch(() => ({}))
     setLoading(false)
     submittingRef.current = false
+    if (res.status === 401) { router.push('/login'); return }
     if (!res.ok) { setError(data.error ?? 'Falha ao salvar.'); return }
     onSuccess()
   }
@@ -733,6 +735,7 @@ function AdjustQuantityModal({
             <input
               type="number"
               min="0"
+              max="9999999"
               step="0.001"
               value={newQty}
               onChange={(e) => setNewQty(e.target.value)}
@@ -769,19 +772,12 @@ function AdjustQuantityModal({
         {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
 
         <div className="flex gap-2">
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-50 transition-colors"
-          >
-            {loading ? 'Salvando…' : 'Salvar'}
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-300 hover:text-gray-100 transition-colors"
-          >
+          <Button onClick={handleSave} loading={loading} className="flex-1">
+            Salvar
+          </Button>
+          <Button variant="ghost" onClick={onClose} className="flex-1">
             Cancelar
-          </button>
+          </Button>
         </div>
       </div>
     </div>

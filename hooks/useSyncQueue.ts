@@ -12,7 +12,7 @@ export interface SyncResult {
   rejected: { item: import('@/lib/offlineQueue').QueueItem | MutationItem; reason: string }[]
 }
 
-const PERMANENT_ERRORS = [400, 401, 403, 404]
+const PERMANENT_ERRORS = [400, 403, 404]
 const FETCH_TIMEOUT_MS = 15_000
 
 async function verifyConnectivity(): Promise<boolean> {
@@ -76,11 +76,17 @@ export function useSyncQueue() {
           offlineQueue.remove(item.id)
           synced++
           syncLock.renew()
+        } else if (res.status === 401) {
+          // Sessão expirada — limpa toda a fila e redireciona para login
+          offlineQueue.clear()
+          localStorage.removeItem('insumoCache')
+          syncLock.release()
+          router.push('/login')
+          return { synced, rejected }
         } else if (res.status === 422 || PERMANENT_ERRORS.includes(res.status)) {
           const body = await res.json().catch(() => ({}))
           offlineQueue.remove(item.id)
           const reason =
-            res.status === 401 ? 'Sessão expirada. Faça login novamente.' :
             res.status === 403 ? 'Sem permissão para esta operação.' :
             res.status === 404 ? 'Insumo ou talhão não encontrado (pode ter sido excluído).' :
             body.error ?? 'Dados inválidos.'
@@ -138,11 +144,17 @@ export function useSyncQueue() {
           mutationQueue.remove(item.id)
           synced++
           syncLock.renew()
+        } else if (res.status === 401) {
+          // Sessão expirada — limpa toda a fila e redireciona para login
+          mutationQueue.clear()
+          localStorage.removeItem('insumoCache')
+          syncLock.release()
+          router.push('/login')
+          return { synced, rejected }
         } else if (res.status === 422 || PERMANENT_ERRORS.includes(res.status)) {
           const errBody = await res.json().catch(() => ({}))
           mutationQueue.remove(item.id)
           const reason =
-            res.status === 401 ? 'Sessão expirada. Faça login novamente.' :
             res.status === 403 ? 'Sem permissão para esta operação.' :
             res.status === 404 && item.op === 'DELETE' ? 'Registro já não existia (OK).' :
             res.status === 404 ? 'Registro não encontrado (pode ter sido excluído).' :

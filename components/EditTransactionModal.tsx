@@ -121,6 +121,7 @@ export function EditTransactionModal({
           label={`Quantidade (${unitLabel}) *`}
           type="number"
           min="0.001"
+          max="9999999"
           step="0.001"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}

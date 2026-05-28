@@ -67,8 +67,28 @@ Operações puramente administrativas (CRUD de usuários, cadastrar fazenda, ger
 ### P7 — Controle de acesso por fazenda
 
 - Toda route sob `/api/farms/[id]/...` começa com `checkFarmAccess(supabase, session, farm_id)` → 403 se sem acesso
-- Routes admin-only: `if (session.role !== 'admin') return 403`
-- Operários SÓ retiradas; admin tudo o resto
+- Gestor: aceito se `farms.owner_id = session.id`
+- Outros cargos (admin/agronomo/operario): aceito se existe linha em `farm_users (user_id=session.id, farm_id=X)` E `farms.owner_id = session.gestor_id` (defesa em profundidade)
+- NUNCA confiar em IDs vindos do client sem este check
+
+### P8 — Multi-tenant por Gestor
+
+**Toda query que retorna dados sensíveis DEVE filtrar por `session.gestor_id`.**
+
+- Cada usuário tem `gestor_id` (coluna NOT NULL na tabela `users`) apontando para o Gestor do seu tenant. Gestor aponta para si próprio.
+- Listagens de usuários: `WHERE gestor_id = session.gestor_id`
+- Vincular fazendas a um usuário: TODAS as fazendas em `farm_ids` precisam ter `owner_id = session.gestor_id`. Se não, retornar 403.
+- NUNCA confie em `created_by` para tenancy — é só audit.
+- Quando criar usuário via API, `gestor_id` é setado a partir de `session.gestor_id` (herda tenant do criador). Não aceite `gestor_id` do body.
+
+### P9 — Permission check via capability matrix
+
+**NUNCA compare `session.role === 'admin'` direto em route handlers.**
+
+- Use `can(session.role, 'namespace.action')` de `lib/permissions.ts` (fonte única de verdade)
+- Para checar se ator pode gerenciar alvo: `canManageUser(actorRole, targetRole)` — Admin não pode mexer em Gestor
+- Mudança de role: incrementa `token_version` do alvo + `invalidateTokenVersionCache(targetId)` (P5 reuso)
+- 4 cargos: `gestor` (root do tenant), `admin`, `agronomo`, `operario`
 
 ---
 
@@ -255,6 +275,59 @@ export function MyForm({ farmId, ...props }: Props) {
 }
 ```
 
+### Template — Route admin com capability + tenant
+
+```ts
+import { NextRequest, NextResponse } from 'next/server'
+import { getActiveSession } from '@/lib/auth'
+import { createServerClient } from '@/lib/supabase'
+import { can, canManageUser } from '@/lib/permissions'
+import { parseBody } from '@/lib/utils'
+
+type Params = { params: Promise<{ uid: string }> }
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await getActiveSession()
+  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+
+  // P9: capability check
+  if (!can(session.role, 'user.edit')) {
+    return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
+  }
+
+  const { uid } = await params
+  const body = await parseBody(req)
+  if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
+
+  const supabase = createServerClient()
+
+  // P8: validar mesmo tenant
+  const { data: target } = await supabase
+    .from('users').select('id, role, gestor_id, token_version')
+    .eq('id', uid).maybeSingle()
+  if (!target || target.gestor_id !== session.gestor_id) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+  if (!canManageUser(session.role, target.role)) {
+    return NextResponse.json({ error: 'Sem permissão para este usuário.' }, { status: 403 })
+  }
+
+  // P8: validar que farm_ids (se houver) pertencem ao tenant
+  if (Array.isArray(body.farm_ids) && body.farm_ids.length > 0) {
+    const { data: owned } = await supabase
+      .from('farms').select('id')
+      .eq('owner_id', session.gestor_id)
+      .in('id', body.farm_ids)
+    if ((owned?.length ?? 0) !== body.farm_ids.length) {
+      return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+    }
+  }
+
+  // ... resto da mutation ...
+  // P5: se mudou role, incrementar token_version + invalidar cache
+}
+```
+
 ### Template — Migration
 
 ```sql
@@ -314,6 +387,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tabela_offline_id
 | Commit sem TSC passar | `npx tsc --noEmit` primeiro |
 | Migration sem `IF NOT EXISTS` | Sempre idempotente |
 | Skip hooks `--no-verify` | Investigar falha do hook |
+| `session.role === 'admin'` em route handler | `can(session.role, 'namespace.action')` |
+| Listar/filtrar por `created_by` | `WHERE gestor_id = session.gestor_id` |
+| Aceitar `farm_id` do body sem validar ownership | `SELECT FROM farms WHERE owner_id = session.gestor_id AND id IN (...)` |
+| Inserir user com `gestor_id` vindo do body | `gestor_id: session.gestor_id` sempre |
 
 ---
 
@@ -323,6 +400,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tabela_offline_id
 2. **Operação de campo?** `mutationQueue` + migration `offline_id`/`updated_at_client` + form com `useOnlineStatus`.
 3. **Operação admin?** Online-only OK, mas `getActiveSession + role check + checkFarmAccess`.
 4. **Mudou role/permissão?** Incrementar `token_version` + `invalidateTokenVersionCache`.
+5. **Criando endpoint que lista/edita usuários ou vincula fazendas?** Sempre `WHERE gestor_id = session.gestor_id` + validar ownership de `farm_ids` (P8).
+6. **Verificando se um cargo pode fazer X?** `can(role, 'namespace.action')` — nunca string comparison (P9).
 5. **Sentiu duplicação de código?** Mover para `lib/`. Componentes/routes pequenos.
 6. **Spec ambígua?** Perguntar antes de codar. Não inventar.
 
@@ -369,5 +448,5 @@ stockdan-app/
 
 ---
 
-**Última atualização:** 2026-05-27 — após implementação de regulagens offline + token_version.
-**Próxima revisão:** sempre que adicionar nova categoria de operação (ex: irrigação, fertilização).
+**Última atualização:** 2026-05-27 — P8 (multi-tenant por Gestor) + P9 (capability matrix) após hierarquia de cargos.
+**Próxima revisão:** sempre que adicionar nova categoria de operação OU novo cargo.

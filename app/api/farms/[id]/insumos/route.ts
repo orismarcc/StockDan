@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
+import { can } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
 import { trimField, isValidDate, isValidQuantity, withinLength } from '@/lib/validate'
@@ -33,8 +34,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  if (!can(session.role, 'insumo.write')) {
+    return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
   }
 
   const { id: farm_id } = await params

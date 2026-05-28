@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
+import { can } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
 
 type Params = { params: Promise<{ id: string }> }
@@ -29,8 +30,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  if (!can(session.role, 'farm.edit')) {
+    return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
   }
 
   const { id } = await params
@@ -77,8 +79,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  if (!can(session.role, 'farm.delete')) {
+    return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
   }
 
   const { id } = await params

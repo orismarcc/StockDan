@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { can } from '@/lib/permissions'
 
 type Format  = 'pdf' | 'xlsx'
 type Section = 'summary' | 'transactions' | 'by_insumo' | 'by_talhao' | 'operators'
@@ -22,6 +23,9 @@ function fmtNum(n: number | null, decimals = 2) {
 export async function GET(req: NextRequest) {
   const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  if (!can(session.role, 'analysis.export')) {
+    return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
+  }
 
   const sp = new URL(req.url).searchParams
   const format    = (sp.get('format') ?? 'pdf') as Format
@@ -41,13 +45,17 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServerClient()
 
-  // 1. Accessible farm IDs
+  // 1. Accessible farm IDs (gestor: owner direto; demais: farm_users do tenant)
   let farmIds: string[] = []
-  if (session.role === 'admin') {
+  if (session.role === 'gestor') {
     const { data } = await supabase.from('farms').select('id').eq('owner_id', session.id)
     farmIds = (data ?? []).map((f: { id: string }) => f.id)
   } else {
-    const { data } = await supabase.from('farm_users').select('farm_id').eq('user_id', session.id)
+    const { data } = await supabase
+      .from('farm_users')
+      .select('farm_id, farms!inner(owner_id)')
+      .eq('user_id', session.id)
+      .eq('farms.owner_id', session.gestor_id)
     farmIds = (data ?? []).map((r: { farm_id: string }) => r.farm_id)
   }
 

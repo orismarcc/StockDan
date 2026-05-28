@@ -6,8 +6,10 @@ type Params = { params: Promise<{ id: string }> }
 
 export async function POST(_req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  // Reivindicar uma fazenda órfã é prerrogativa do Gestor (assume responsabilidade)
+  if (session.role !== 'gestor') {
+    return NextResponse.json({ error: 'Apenas Gestor pode reivindicar fazenda.' }, { status: 403 })
   }
 
   const { id: farmId } = await params

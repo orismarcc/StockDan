@@ -48,28 +48,40 @@ export async function verifyToken(token: string): Promise<SessionUser | null> {
   }
 }
 
-// ── Cache em memória do token_version (TTL 30s) ──────────────────────────────
+// ── Cache em memória (TTL 30s) ───────────────────────────────────────────────
 // Evita DB round-trip em toda request. Trade-off: usuário rebaixado pode ter até
 // 30s de janela com privilégios antigos. Aceitável para o caso de uso (mudanças
 // de cargo são raras e propagadas em segundos, não em horas).
-const TV_CACHE = new Map<string, { tv: number; expiresAt: number }>()
+const TV_CACHE = new Map<string, { tv: number; role: string; gestor_id: string | null; expiresAt: number }>()
 const TV_CACHE_TTL = 30_000
 
-async function getCurrentTokenVersion(userId: string): Promise<number | null> {
+interface DBUserSnapshot {
+  tv: number
+  role: string
+  gestor_id: string | null
+}
+
+async function getUserSnapshot(userId: string): Promise<DBUserSnapshot | null> {
   const cached = TV_CACHE.get(userId)
-  if (cached && cached.expiresAt > Date.now()) return cached.tv
+  if (cached && cached.expiresAt > Date.now()) {
+    return { tv: cached.tv, role: cached.role, gestor_id: cached.gestor_id }
+  }
 
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('users')
-    .select('token_version')
+    .select('token_version, role, gestor_id')
     .eq('id', userId)
     .single()
 
   if (error || !data) return null
-  const tv = data.token_version ?? 0
-  TV_CACHE.set(userId, { tv, expiresAt: Date.now() + TV_CACHE_TTL })
-  return tv
+  const snapshot: DBUserSnapshot = {
+    tv: data.token_version ?? 0,
+    role: data.role,
+    gestor_id: data.gestor_id ?? null,
+  }
+  TV_CACHE.set(userId, { ...snapshot, expiresAt: Date.now() + TV_CACHE_TTL })
+  return snapshot
 }
 
 /** Invalida cache imediatamente (chamado quando token_version é incrementado). */
@@ -78,18 +90,26 @@ export function invalidateTokenVersionCache(userId: string) {
 }
 
 /**
- * Verificação completa: assinatura + token_version contra DB.
- * Use esta sempre que o resultado for confiar em `role` para autorização.
+ * Verificação completa: assinatura + token_version + role contra DB.
+ *
+ * Valida também que role e gestor_id no token batem com o banco — detecta
+ * tokens emitidos antes de mudanças de cargo feitas diretamente via SQL
+ * (sem incrementar token_version, ex: migration RH-1 admin→gestor).
  */
 async function verifyTokenStrict(token: string): Promise<SessionUser | null> {
   const payload = await verifyToken(token)
   if (!payload) return null
 
-  const currentTv = await getCurrentTokenVersion(payload.id)
-  if (currentTv === null) return null // usuário deletado
+  const snapshot = await getUserSnapshot(payload.id)
+  if (!snapshot) return null // usuário deletado
 
   const tokenTv = payload.tv ?? 0
-  if (tokenTv < currentTv) return null // token revogado por mudança de role
+  if (tokenTv < snapshot.tv) return null // token revogado
+
+  // Se o role ou gestor_id divergem do banco, o token está stale.
+  // Retorna null para forçar re-login e emitir token com dados corretos.
+  if (payload.role !== snapshot.role) return null
+  if ((payload.gestor_id ?? null) !== snapshot.gestor_id) return null
 
   return payload
 }

@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@/lib/supabase'
+import type { Role } from './permissions'
 
 const COOKIE = 'stockdan_session'
 
@@ -18,7 +19,8 @@ export interface SessionUser {
   id: string
   email: string
   name: string
-  role: 'admin' | 'operario'
+  role: Role
+  gestor_id: string
   mustChangePassword: boolean
   /** Versão do token. Incrementada no DB quando a sessão precisa ser invalidada
    *  (mudança de cargo). verifyToken rejeita JWTs com tv menor que o do DB. */

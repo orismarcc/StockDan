@@ -25,7 +25,7 @@ export async function POST() {
   const supabase = createServerClient()
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, name, email, role, must_change_password, token_version')
+    .select('id, name, email, role, must_change_password, token_version, gestor_id')
     .eq('id', session.id)
     .single()
 
@@ -41,6 +41,7 @@ export async function POST() {
     role: user.role,
     mustChangePassword: user.must_change_password,
     tv: user.token_version ?? 0,
+    gestor_id: user.gestor_id,
   })
 
   const res = NextResponse.json({ ok: true, mustChangePassword: user.must_change_password })

@@ -110,8 +110,8 @@ async function patchHandler(req: NextRequest, { params }: Params) {
 
   // Password reset (preserva funcionalidade existente — admin pode redefinir senha)
   if (typeof body.password === 'string' && body.password.length > 0) {
-    if (body.password.length < 6) {
-      return NextResponse.json({ error: 'Senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
+    if (body.password.length < 8) {
+      return NextResponse.json({ error: 'Senha deve ter pelo menos 8 caracteres.' }, { status: 400 })
     }
     updates.password_hash = await bcrypt.hash(body.password, 10)
     updates.must_change_password = true

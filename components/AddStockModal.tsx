@@ -43,19 +43,25 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
     // Idempotency mesmo online: protege contra retry de timeout do navegador
     const offline_id = crypto.randomUUID()
 
-    const res = await fetch(`/api/farms/${farmId}/insumos/${insumoId}/stock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: qty, date, notes, offline_id }),
-    })
+    try {
+      const res = await fetch(`/api/farms/${farmId}/insumos/${insumoId}/stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: qty, date, notes, offline_id }),
+      })
 
-    const data = await res.json()
-    setLoading(false)
-    submittingRef.current = false
+      const data = await res.json()
+      setLoading(false)
+      submittingRef.current = false
 
-    if (res.status === 401) { router.push('/login'); return }
-    if (!res.ok) { setError(data.error); return }
-    onSuccess()
+      if (res.status === 401) { router.push('/login'); return }
+      if (!res.ok) { setError(data.error); return }
+      onSuccess()
+    } catch {
+      setLoading(false)
+      submittingRef.current = false
+      setError('Erro de conexão. Verifique sua internet e tente novamente.')
+    }
   }
 
   return (

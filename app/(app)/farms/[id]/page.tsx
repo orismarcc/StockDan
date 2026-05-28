@@ -11,7 +11,11 @@ import { can } from '@/lib/permissions'
 // Deduplica a query de farm entre generateMetadata e FarmPage no mesmo request
 const getFarm = cache(async (id: string) => {
   const supabase = createServerClient()
-  const { data } = await supabase.from('farms').select('*').eq('id', id).single()
+  const { data } = await supabase
+    .from('farms')
+    .select('id, name, farmer_name, city, state, created_at, updated_at')
+    .eq('id', id)
+    .single()
   return data
 })
 
@@ -38,8 +42,8 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
   if (!farm) notFound()
 
   const [{ data: insumos }, { data: talhoes }, { data: transactions }] = await Promise.all([
-    supabase.from('insumos').select('*').eq('farm_id', id).order('title'),
-    supabase.from('talhoes').select('*').eq('farm_id', id).order('name'),
+    supabase.from('insumos').select('id, farm_id, title, unit, quantity, min_quantity, description, updated_at').eq('farm_id', id).order('title'),
+    supabase.from('talhoes').select('id, farm_id, name, area_ha, description, updated_at').eq('farm_id', id).order('name'),
     supabase
       .from('transactions')
       .select('*, insumos(title, unit), talhoes(id, name), users(name)')

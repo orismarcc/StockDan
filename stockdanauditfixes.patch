@@ -1,0 +1,639 @@
+From bd11c0b182a1e70e0bb637dd3e9169881afde287 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 28 May 2026 02:22:49 +0000
+Subject: [PATCH] fix(audit): aplicar todos os fixes da auditoria completa
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+P0 — Bugs críticos:
+- transactions/[tid]: corrige `ha` → `area_ha` (variável indefinida, bug silencioso)
+- AddStockModal, AdjustQuantityModal: adiciona redirect para /login em 401
+- useSyncQueue: 401 durante sync limpa fila + insumoCache + redireciona para login
+
+P1 — Segurança:
+- insumos POST/PUT: adiciona withinLength(description, 500)
+- farms/[id] PUT: adiciona withinLength em name, farmer_name, city + trimField
+- next.config.ts: adiciona Content-Security-Policy com connect-src para Supabase
+- Sidebar: limpa insumoCache e stockdan_queue no logout
+- sw.js: não cacheia respostas 401 / redirect-to-login; limpa cache de páginas autenticadas
+
+P2 — Performance / Qualidade:
+- report/route.ts: extrai aggregateData compartilhado — elimina byInsumo2/byTalhao2/byUser2 duplicados
+- farms/[id]/page.tsx: paraleliza checkFarmAccess + getFarm com Promise.all
+- offlineQueue: adiciona TTL de 24h para itens expirados; adiciona clear()
+- .env.example: documenta variáveis de ambiente necessárias
+
+P3 — Acessibilidade / UX:
+- Modal.tsx: implementa focus trap (Tab/Shift+Tab), role="dialog", aria-modal, aria-labelledby
+- EditTransactionModal: adiciona max="9999999" no input de quantidade
+- AdjustQuantityModal: adiciona max="9999999" + usa Button do design system
+
+https://claude.ai/code/session_01GCRL2mxfUuFsfEVM7zsH8b
+---
+ .env.example                                  |  7 ++
+ .gitignore                                    |  1 +
+ app/(app)/farms/[id]/page.tsx                 |  8 +-
+ app/api/analise/report/route.ts               | 99 ++++++++-----------
+ app/api/farms/[id]/insumos/[iid]/route.ts     |  8 +-
+ app/api/farms/[id]/insumos/route.ts           |  3 +
+ app/api/farms/[id]/route.ts                   | 15 ++-
+ .../farms/[id]/transactions/[tid]/route.ts    |  2 +-
+ components/AddStockModal.tsx                  |  3 +
+ components/EditTransactionModal.tsx           |  1 +
+ components/FarmTabs.tsx                       | 20 ++--
+ components/Sidebar.tsx                        |  3 +
+ components/ui/Modal.tsx                       | 44 ++++++++-
+ hooks/useSyncQueue.ts                         | 10 +-
+ lib/offlineQueue.ts                           | 16 ++-
+ next.config.ts                                | 16 +++
+ public/sw.js                                  | 15 ++-
+ 17 files changed, 185 insertions(+), 86 deletions(-)
+ create mode 100644 .env.example
+
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..9961097
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,7 @@
++# Supabase
++# Encontre em: https://supabase.com/dashboard/project/<seu-projeto>/settings/api
++NEXT_PUBLIC_SUPABASE_URL=https://<projeto>.supabase.co
++SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
++
++# JWT — gere uma string aleatória segura (ex: openssl rand -hex 32)
++JWT_SECRET=<segredo-aleatorio-min-32-chars>
+diff --git a/.gitignore b/.gitignore
+index 719eab2..e9dbcc6 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -32,6 +32,7 @@ yarn-error.log*
+ 
+ # env files (can opt-in for committing if needed)
+ .env*
++!.env.example
+ 
+ # vercel
+ .vercel
+diff --git a/app/(app)/farms/[id]/page.tsx b/app/(app)/farms/[id]/page.tsx
+index 0a8f44a..042d8c3 100644
+--- a/app/(app)/farms/[id]/page.tsx
++++ b/app/(app)/farms/[id]/page.tsx
+@@ -29,9 +29,11 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
+   const { id } = await params
+   const supabase = createServerClient()
+ 
+-  if (!(await checkFarmAccess(supabase, session, id))) redirect('/dashboard')
+-
+-  const farm = await getFarm(id)
++  const [hasAccess, farm] = await Promise.all([
++    checkFarmAccess(supabase, session, id),
++    getFarm(id),
++  ])
++  if (!hasAccess) redirect('/dashboard')
+   if (!farm) notFound()
+ 
+   const [{ data: insumos }, { data: talhoes }, { data: transactions }] = await Promise.all([
+diff --git a/app/api/analise/report/route.ts b/app/api/analise/report/route.ts
+index 7ac0830..4eedfda 100644
+--- a/app/api/analise/report/route.ts
++++ b/app/api/analise/report/route.ts
+@@ -97,6 +97,39 @@ export async function GET(req: NextRequest) {
+       .map(t => [t.user_id as string, t.users![0].name])
+   )
+ 
++  // ─── Shared aggregation (used by both PDF and XLSX) ──────────────────────────
++  type AggEntry = { qty: number; area: number; count: number }
++
++  const totalKg   = txs.reduce((s, t) => s + Number(t.quantity), 0)
++  const totalArea = txs.filter(t => t.area_ha && t.area_ha > 0).reduce((s, t) => s + Number(t.area_ha), 0)
++  const avgKgHa   = totalArea > 0 ? totalKg / totalArea : null
++
++  const byInsumo: Record<string, AggEntry> = {}
++  for (const t of txs) {
++    if (!byInsumo[t.insumo_id]) byInsumo[t.insumo_id] = { qty: 0, area: 0, count: 0 }
++    byInsumo[t.insumo_id].qty   += Number(t.quantity)
++    byInsumo[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
++    byInsumo[t.insumo_id].count += 1
++  }
++
++  const byTalhao: Record<string, AggEntry> = {}
++  for (const t of txs) {
++    if (!t.talhao_id) continue
++    if (!byTalhao[t.talhao_id]) byTalhao[t.talhao_id] = { qty: 0, area: 0, count: 0 }
++    byTalhao[t.talhao_id].qty   += Number(t.quantity)
++    byTalhao[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
++    byTalhao[t.talhao_id].count += 1
++  }
++
++  const byUser: Record<string, AggEntry> = {}
++  for (const t of txs) {
++    const uid = t.user_id ?? '__unknown__'
++    if (!byUser[uid]) byUser[uid] = { qty: 0, area: 0, count: 0 }
++    byUser[uid].qty   += Number(t.quantity)
++    byUser[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
++    byUser[uid].count += 1
++  }
++
+   // ─── PDF ────────────────────────────────────────────────────────────────────
+   if (format === 'pdf') {
+     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+@@ -104,37 +137,6 @@ export async function GET(req: NextRequest) {
+       import('jspdf-autotable'),
+     ])
+ 
+-    // ── Aggregates ─────────────────────────────────────────────────────────
+-    const totalKg   = txs.reduce((s, t) => s + Number(t.quantity), 0)
+-    const totalArea = txs.filter(t => t.area_ha && t.area_ha > 0).reduce((s, t) => s + Number(t.area_ha), 0)
+-    const avgKgHa   = totalArea > 0 ? totalKg / totalArea : null
+-
+-    const byInsumo: Record<string, { qty: number; area: number; count: number }> = {}
+-    for (const t of txs) {
+-      if (!byInsumo[t.insumo_id]) byInsumo[t.insumo_id] = { qty: 0, area: 0, count: 0 }
+-      byInsumo[t.insumo_id].qty   += Number(t.quantity)
+-      byInsumo[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+-      byInsumo[t.insumo_id].count += 1
+-    }
+-
+-    const byTalhao: Record<string, { qty: number; area: number; count: number }> = {}
+-    for (const t of txs) {
+-      if (!t.talhao_id) continue
+-      if (!byTalhao[t.talhao_id]) byTalhao[t.talhao_id] = { qty: 0, area: 0, count: 0 }
+-      byTalhao[t.talhao_id].qty   += Number(t.quantity)
+-      byTalhao[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+-      byTalhao[t.talhao_id].count += 1
+-    }
+-
+-    const byUser: Record<string, { qty: number; area: number; count: number }> = {}
+-    for (const t of txs) {
+-      const uid = t.user_id ?? '__unknown__'
+-      if (!byUser[uid]) byUser[uid] = { qty: 0, area: 0, count: 0 }
+-      byUser[uid].qty   += Number(t.quantity)
+-      byUser[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+-      byUser[uid].count += 1
+-    }
+-
+     // ── Setup ──────────────────────────────────────────────────────────────
+     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+ 
+@@ -642,18 +644,11 @@ export async function GET(req: NextRequest) {
+   }
+ 
+   if (sections.includes('by_insumo')) {
+-    const byInsumo2: Record<string, { qty: number; area: number; count: number }> = {}
+-    for (const t of txs) {
+-      if (!byInsumo2[t.insumo_id]) byInsumo2[t.insumo_id] = { qty: 0, area: 0, count: 0 }
+-      byInsumo2[t.insumo_id].qty   += Number(t.quantity)
+-      byInsumo2[t.insumo_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+-      byInsumo2[t.insumo_id].count += 1
+-    }
+-    const totalKgXlsx = Object.values(byInsumo2).reduce((s, d) => s + d.qty, 0)
+-    const rows = Object.entries(byInsumo2)
++    const totalKgXlsx = Object.values(byInsumo).reduce((s, d) => s + d.qty, 0)
++    const rows = Object.entries(byInsumo)
+       .sort(([, a], [, b]) => b.qty - a.qty)
+       .map(([id, { qty, area, count }]) => ({
+-        Insumo:              insumoMap[id] ?? id,
++        Insumo: insumoMap[id] ?? id,
+         Aplicações:          count,
+         'Total (kg)':        qty,
+         'Área total (ha)':   area || null,
+@@ -666,15 +661,7 @@ export async function GET(req: NextRequest) {
+   }
+ 
+   if (sections.includes('by_talhao')) {
+-    const byTalhao2: Record<string, { qty: number; area: number; count: number }> = {}
+-    for (const t of txs) {
+-      if (!t.talhao_id) continue
+-      if (!byTalhao2[t.talhao_id]) byTalhao2[t.talhao_id] = { qty: 0, area: 0, count: 0 }
+-      byTalhao2[t.talhao_id].qty   += Number(t.quantity)
+-      byTalhao2[t.talhao_id].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+-      byTalhao2[t.talhao_id].count += 1
+-    }
+-    const rows = Object.entries(byTalhao2)
++    const rows = Object.entries(byTalhao)
+       .sort(([, a], [, b]) => b.qty - a.qty)
+       .map(([id, { qty, area, count }]) => {
+         const talhao  = talhaoMap[id]
+@@ -695,16 +682,8 @@ export async function GET(req: NextRequest) {
+   }
+ 
+   if (sections.includes('operators')) {
+-    const byUser2: Record<string, { qty: number; area: number; count: number }> = {}
+-    for (const t of txs) {
+-      const uid = t.user_id ?? '__unknown__'
+-      if (!byUser2[uid]) byUser2[uid] = { qty: 0, area: 0, count: 0 }
+-      byUser2[uid].qty   += Number(t.quantity)
+-      byUser2[uid].area  += t.area_ha && t.area_ha > 0 ? Number(t.area_ha) : 0
+-      byUser2[uid].count += 1
+-    }
+-    const totalKgXlsx = Object.values(byUser2).reduce((s, d) => s + d.qty, 0)
+-    const rows = Object.entries(byUser2)
++    const totalKgXlsx = Object.values(byUser).reduce((s, d) => s + d.qty, 0)
++    const rows = Object.entries(byUser)
+       .sort(([, a], [, b]) => b.qty - a.qty)
+       .map(([uid, { qty, area, count }]) => ({
+         Operador:               userMap[uid] ?? 'Desconhecido',
+diff --git a/app/api/farms/[id]/insumos/[iid]/route.ts b/app/api/farms/[id]/insumos/[iid]/route.ts
+index ade1048..bd77bdc 100644
+--- a/app/api/farms/[id]/insumos/[iid]/route.ts
++++ b/app/api/farms/[id]/insumos/[iid]/route.ts
+@@ -85,7 +85,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
+     if (!withinLength(t, 120)) return NextResponse.json({ error: 'Nome excede 120 caracteres.' }, { status: 400 })
+     updateData.title = t
+   }
+-  if (description !== undefined) updateData.description = trimField(description)
++  if (description !== undefined) {
++    const d = trimField(description)
++    if (d && !withinLength(d, 500)) {
++      return NextResponse.json({ error: 'Descrição excede 500 caracteres.' }, { status: 400 })
++    }
++    updateData.description = d
++  }
+   if (min_quantity !== undefined) {
+     const mq = min_quantity != null ? Number(min_quantity) : null
+     if (mq !== null && (!Number.isFinite(mq) || mq < 0 || mq > 9_999_999)) {
+diff --git a/app/api/farms/[id]/insumos/route.ts b/app/api/farms/[id]/insumos/route.ts
+index 073cff3..beed2d4 100644
+--- a/app/api/farms/[id]/insumos/route.ts
++++ b/app/api/farms/[id]/insumos/route.ts
+@@ -57,6 +57,9 @@ export async function POST(req: NextRequest, { params }: Params) {
+   if (!withinLength(title, 120)) {
+     return NextResponse.json({ error: 'Nome do insumo excede 120 caracteres.' }, { status: 400 })
+   }
++  if (description && !withinLength(description, 500)) {
++    return NextResponse.json({ error: 'Descrição excede 500 caracteres.' }, { status: 400 })
++  }
+   if (unit !== 'kg') {
+     return NextResponse.json({ error: 'Unidade inválida. Use kg.' }, { status: 400 })
+   }
+diff --git a/app/api/farms/[id]/route.ts b/app/api/farms/[id]/route.ts
+index 7e4177c..b8e5d50 100644
+--- a/app/api/farms/[id]/route.ts
++++ b/app/api/farms/[id]/route.ts
+@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
+ import { createServerClient } from '@/lib/supabase'
+ import { checkFarmAccess } from '@/lib/farmAccess'
+ import { parseBody } from '@/lib/utils'
++import { trimField, withinLength } from '@/lib/validate'
+ 
+ type Params = { params: Promise<{ id: string }> }
+ 
+@@ -42,11 +43,23 @@ export async function PUT(req: NextRequest, { params }: Params) {
+ 
+   const body = await parseBody<{ name?: string; city?: string; state?: string; farmer_name?: string }>(req)
+   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
+-  const { name, city, state, farmer_name } = body
++  const name        = trimField(body.name)
++  const city        = trimField(body.city)
++  const state       = trimField(body.state)
++  const farmer_name = trimField(body.farmer_name)
+ 
+   if (!name || !city || !state || !farmer_name) {
+     return NextResponse.json({ error: 'Preencha todos os campos.' }, { status: 400 })
+   }
++  if (!withinLength(name, 120)) {
++    return NextResponse.json({ error: 'Nome da fazenda excede 120 caracteres.' }, { status: 400 })
++  }
++  if (!withinLength(farmer_name, 120)) {
++    return NextResponse.json({ error: 'Nome do produtor excede 120 caracteres.' }, { status: 400 })
++  }
++  if (!withinLength(city, 80)) {
++    return NextResponse.json({ error: 'Nome da cidade excede 80 caracteres.' }, { status: 400 })
++  }
+ 
+   const { data, error } = await supabase
+     .from('farms')
+diff --git a/app/api/farms/[id]/transactions/[tid]/route.ts b/app/api/farms/[id]/transactions/[tid]/route.ts
+index 0090254..f20a066 100644
+--- a/app/api/farms/[id]/transactions/[tid]/route.ts
++++ b/app/api/farms/[id]/transactions/[tid]/route.ts
+@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
+ 
+     const { error } = await supabase
+       .from('transactions')
+-      .update({ area_ha: ha })
++      .update({ area_ha })
+       .eq('id', tid)
+       .eq('farm_id', farm_id)
+ 
+diff --git a/components/AddStockModal.tsx b/components/AddStockModal.tsx
+index f82c54f..a13ce08 100644
+--- a/components/AddStockModal.tsx
++++ b/components/AddStockModal.tsx
+@@ -1,6 +1,7 @@
+ 'use client'
+ 
+ import { useState, useRef } from 'react'
++import { useRouter } from 'next/navigation'
+ import { Modal } from './ui/Modal'
+ import { Input } from './ui/Input'
+ import { Textarea } from './ui/Textarea'
+@@ -23,6 +24,7 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
+   const [error, setError]       = useState('')
+   const [loading, setLoading]   = useState(false)
+   const submittingRef           = useRef(false)
++  const router                  = useRouter()
+ 
+   async function handleSubmit(e: React.FormEvent) {
+     e.preventDefault()
+@@ -47,6 +49,7 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
+     setLoading(false)
+     submittingRef.current = false
+ 
++    if (res.status === 401) { router.push('/login'); return }
+     if (!res.ok) { setError(data.error); return }
+     onSuccess()
+   }
+diff --git a/components/EditTransactionModal.tsx b/components/EditTransactionModal.tsx
+index 22d0994..f7f6014 100644
+--- a/components/EditTransactionModal.tsx
++++ b/components/EditTransactionModal.tsx
+@@ -85,6 +85,7 @@ export function EditTransactionModal({
+           label={`Quantidade (${unitLabel}) *`}
+           type="number"
+           min="0.001"
++          max="9999999"
+           step="0.001"
+           value={quantity}
+           onChange={(e) => setQuantity(e.target.value)}
+diff --git a/components/FarmTabs.tsx b/components/FarmTabs.tsx
+index 1061453..2ebcf33 100644
+--- a/components/FarmTabs.tsx
++++ b/components/FarmTabs.tsx
+@@ -692,6 +692,7 @@ function AdjustQuantityModal({
+   const [loading, setLoading] = useState(false)
+   const [error,   setError]   = useState('')
+   const submittingRef = useRef(false)
++  const router = useRouter()
+ 
+   const unitLabel = 'kg'
+   const delta = Number(newQty) - currentQty
+@@ -710,6 +711,7 @@ function AdjustQuantityModal({
+     const data = await res.json().catch(() => ({}))
+     setLoading(false)
+     submittingRef.current = false
++    if (res.status === 401) { router.push('/login'); return }
+     if (!res.ok) { setError(data.error ?? 'Falha ao salvar.'); return }
+     onSuccess()
+   }
+@@ -728,6 +730,7 @@ function AdjustQuantityModal({
+             <input
+               type="number"
+               min="0"
++              max="9999999"
+               step="0.001"
+               value={newQty}
+               onChange={(e) => setNewQty(e.target.value)}
+@@ -764,19 +767,12 @@ function AdjustQuantityModal({
+         {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+ 
+         <div className="flex gap-2">
+-          <button
+-            onClick={handleSave}
+-            disabled={loading}
+-            className="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-50 transition-colors"
+-          >
+-            {loading ? 'Salvando…' : 'Salvar'}
+-          </button>
+-          <button
+-            onClick={onClose}
+-            className="flex-1 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-300 hover:text-gray-100 transition-colors"
+-          >
++          <Button onClick={handleSave} loading={loading} className="flex-1">
++            Salvar
++          </Button>
++          <Button variant="ghost" onClick={onClose} className="flex-1">
+             Cancelar
+-          </button>
++          </Button>
+         </div>
+       </div>
+     </div>
+diff --git a/components/Sidebar.tsx b/components/Sidebar.tsx
+index db0dab9..035e711 100644
+--- a/components/Sidebar.tsx
++++ b/components/Sidebar.tsx
+@@ -42,6 +42,9 @@ export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProp
+ 
+   async function handleLogout() {
+     await fetch('/api/auth/logout', { method: 'POST' })
++    // Clear per-user client caches so a subsequent login doesn't see stale data
++    localStorage.removeItem('insumoCache')
++    localStorage.removeItem('stockdan_queue')
+     router.push('/login')
+     router.refresh()
+   }
+diff --git a/components/ui/Modal.tsx b/components/ui/Modal.tsx
+index 4cefd9a..6d975ca 100644
+--- a/components/ui/Modal.tsx
++++ b/components/ui/Modal.tsx
+@@ -1,7 +1,16 @@
+ 'use client'
+ 
+ import { cn } from '@/lib/utils'
+-import { ReactNode, useEffect } from 'react'
++import { ReactNode, useEffect, useRef } from 'react'
++
++const FOCUSABLE = [
++  'a[href]',
++  'button:not([disabled])',
++  'input:not([disabled])',
++  'select:not([disabled])',
++  'textarea:not([disabled])',
++  '[tabindex]:not([tabindex="-1"])',
++].join(', ')
+ 
+ interface ModalProps {
+   open: boolean
+@@ -12,13 +21,38 @@ interface ModalProps {
+ }
+ 
+ export function Modal({ open, onClose, title, children, className }: ModalProps) {
++  const panelRef = useRef<HTMLDivElement>(null)
++
+   useEffect(() => {
+     if (!open) return
++
+     const handler = (e: KeyboardEvent) => {
+-      if (e.key === 'Escape') onClose()
++      if (e.key === 'Escape') { onClose(); return }
++      if (e.key !== 'Tab') return
++
++      const panel = panelRef.current
++      if (!panel) return
++      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
++      if (focusable.length === 0) return
++
++      const first = focusable[0]
++      const last  = focusable[focusable.length - 1]
++
++      if (e.shiftKey) {
++        if (document.activeElement === first) { e.preventDefault(); last.focus() }
++      } else {
++        if (document.activeElement === last)  { e.preventDefault(); first.focus() }
++      }
+     }
++
+     window.addEventListener('keydown', handler)
+     document.body.style.overflow = 'hidden'
++
++    // Move focus into the panel on open
++    const panel = panelRef.current
++    const firstFocusable = panel?.querySelector<HTMLElement>(FOCUSABLE)
++    firstFocusable?.focus()
++
+     return () => {
+       window.removeEventListener('keydown', handler)
+       document.body.style.overflow = ''
+@@ -36,13 +70,17 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
+       />
+       {/* Panel */}
+       <div
++        ref={panelRef}
++        role="dialog"
++        aria-modal="true"
++        aria-labelledby="modal-title"
+         className={cn(
+           'relative z-10 w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 shadow-2xl fade-in overflow-y-auto max-h-[90dvh]',
+           className
+         )}
+       >
+         <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+-          <h2 className="text-base font-semibold text-gray-100">{title}</h2>
++          <h2 id="modal-title" className="text-base font-semibold text-gray-100">{title}</h2>
+           <button
+             onClick={onClose}
+             className="rounded-lg p-2 text-gray-500 hover:bg-gray-800 hover:text-gray-300 transition-colors"
+diff --git a/hooks/useSyncQueue.ts b/hooks/useSyncQueue.ts
+index 95336a3..5e0e112 100644
+--- a/hooks/useSyncQueue.ts
++++ b/hooks/useSyncQueue.ts
+@@ -11,7 +11,7 @@ export interface SyncResult {
+   rejected: { item: import('@/lib/offlineQueue').QueueItem; reason: string }[]
+ }
+ 
+-const PERMANENT_ERRORS = [400, 401, 403, 404]
++const PERMANENT_ERRORS = [400, 403, 404]
+ const FETCH_TIMEOUT_MS = 15_000
+ 
+ async function verifyConnectivity(): Promise<boolean> {
+@@ -84,12 +84,18 @@ export function useSyncQueue() {
+             offlineQueue.remove(item.id)
+             synced++
+             syncLock.renew() // extend TTL so lock doesn't expire on long syncs
++          } else if (res.status === 401) {
++            // Sessão expirada — limpa a fila inteira e redireciona
++            offlineQueue.clear()
++            localStorage.removeItem('insumoCache')
++            syncLock.release()
++            router.push('/login')
++            return { synced, rejected }
+           } else if (res.status === 422 || PERMANENT_ERRORS.includes(res.status)) {
+             // [OFFLINE-6] Erros permanentes: descartar imediatamente sem gastar retries
+             const body = await res.json().catch(() => ({}))
+             offlineQueue.remove(item.id)
+             const reason =
+-              res.status === 401 ? 'Sessão expirada. Faça login novamente.' :
+               res.status === 403 ? 'Sem permissão para esta operação.' :
+               res.status === 404 ? 'Insumo ou talhão não encontrado (pode ter sido excluído).' :
+               body.error ?? 'Dados inválidos.'
+diff --git a/lib/offlineQueue.ts b/lib/offlineQueue.ts
+index a4a3852..db0c4c6 100644
+--- a/lib/offlineQueue.ts
++++ b/lib/offlineQueue.ts
+@@ -34,11 +34,19 @@ function write(items: QueueItem[]) {
+ }
+ 
+ const MAX_RETRIES = 5
++const ITEM_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+ 
+ export const offlineQueue = {
+   MAX_RETRIES,
+ 
+-  getAll: read,
++  getAll(): QueueItem[] {
++    const now = Date.now()
++    const items = read()
++    const fresh = items.filter((i) => now - new Date(i.created_at).getTime() < ITEM_TTL_MS)
++    // Persist if any expired items were dropped
++    if (fresh.length !== items.length) write(fresh)
++    return fresh
++  },
+ 
+   add(item: Omit<QueueItem, 'id' | 'created_at' | 'retries'>): QueueItem {
+     const full: QueueItem = {
+@@ -69,6 +77,10 @@ export const offlineQueue = {
+   },
+ 
+   count(): number {
+-    return read().length
++    return this.getAll().length
++  },
++
++  clear() {
++    write([])
+   },
+ }
+diff --git a/next.config.ts b/next.config.ts
+index 558cc29..2cc061a 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -1,11 +1,27 @@
+ import type { NextConfig } from 'next'
+ 
++const SUPABASE_HOST = process.env.NEXT_PUBLIC_SUPABASE_URL
++  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
++  : '*.supabase.co'
++
++const CSP = [
++  "default-src 'self'",
++  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
++  "style-src 'self' 'unsafe-inline'",
++  `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST}`,
++  "img-src 'self' data: blob:",
++  "font-src 'self'",
++  "worker-src 'self' blob:",
++  "frame-ancestors 'none'",
++].join('; ')
++
+ const securityHeaders = [
+   { key: 'X-Frame-Options',           value: 'DENY' },
+   { key: 'X-Content-Type-Options',    value: 'nosniff' },
+   { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
+   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
+   { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=(), payment=()' },
++  { key: 'Content-Security-Policy',   value: CSP },
+ ]
+ 
+ const nextConfig: NextConfig = {
+diff --git a/public/sw.js b/public/sw.js
+index 67ccf4d..5501bae 100644
+--- a/public/sw.js
++++ b/public/sw.js
+@@ -49,7 +49,20 @@ self.addEventListener('fetch', (event) => {
+       caches.open(CACHE).then((cache) =>
+         fetch(request)
+           .then((res) => {
+-            if (res.ok) cache.put(request, res.clone()).catch(() => {})
++            // Não cacheia respostas de autenticação (401) nem redirecionamentos para login
++            const redirectedToLogin = res.url && res.url.includes('/login')
++            if (res.ok && !redirectedToLogin) {
++              cache.put(request, res.clone()).catch(() => {})
++            } else if (res.status === 401 || redirectedToLogin) {
++              // Limpa cache de páginas autenticadas para evitar servir conteúdo de outro usuário
++              cache.keys().then((keys) =>
++                Promise.all(
++                  keys
++                    .filter((k) => !k.url.startsWith(self.location.origin + '/_next/'))
++                    .map((k) => cache.delete(k))
++                )
++              )
++            }
+             return res
+           })
+           .catch(async () => {
+-- 
+2.43.0
+

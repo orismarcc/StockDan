@@ -42,9 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           window.addEventListener('beforeinstallprompt', function(e) {
             e.preventDefault();
             window.__deferredPrompt = e;
-            console.log('[PWA] beforeinstallprompt capturado');
           });
-          console.log('[PWA] listener registrado');
         `}</Script>
         <SwRegistration />
         {children}

@@ -13,10 +13,12 @@ async function getFarmsWithStats(userId: string, role: string, gestorId: string)
 
   let farmsData: any[] = []
 
+  const FARM_FIELDS = 'id, name, farmer_name, city, state, created_at, updated_at'
+
   if (role === 'gestor') {
     const { data } = await supabase
       .from('farms')
-      .select('*')
+      .select(FARM_FIELDS)
       .eq('owner_id', userId)
       .order('name')
     farmsData = data ?? []
@@ -24,10 +26,10 @@ async function getFarmsWithStats(userId: string, role: string, gestorId: string)
     // Admin/Agrônomo/Operário: fazendas vinculadas via farm_users, dentro do tenant
     const { data } = await supabase
       .from('farm_users')
-      .select('farms!inner(*)')
+      .select(`farms!inner(${FARM_FIELDS})`)
       .eq('user_id', userId)
       .eq('farms.owner_id', gestorId)
-    farmsData = (data ?? []).map((r: any) => r.farms).filter(Boolean)
+    farmsData = (data ?? []).map((r: { farms: unknown }) => r.farms).filter(Boolean)
   }
 
   if (farmsData.length === 0) return []

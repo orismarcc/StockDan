@@ -4,26 +4,9 @@ import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
-import { isValidDate, isValidQuantity, isUUID, withinLength, trimField } from '@/lib/validate'
+import { isValidDate, isValidQuantity, isUUID, withinLength, trimField, parseClientTimestamp } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string }> }
-
-/**
- * Valida e sanitiza o timestamp enviado pelo cliente para registros offline.
- * Aceito: ISO 8601 válido, dentro dos últimos 7 dias até +1 minuto.
- * Retorna null se inválido — a RPC usará NOW() como fallback.
- */
-function parseClientTimestamp(raw: unknown): string | null {
-  if (!raw || typeof raw !== 'string') return null
-  const ts = new Date(raw)
-  if (isNaN(ts.getTime())) return null
-  const now = Date.now()
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
-  const oneMinuteMs = 60 * 1000
-  if (ts.getTime() < now - sevenDaysMs) return null // muito antigo
-  if (ts.getTime() > now + oneMinuteMs) return null  // futuro (clock skew tolerado)
-  return ts.toISOString()
-}
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT     = 200

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { can } from '@/lib/permissions'
 
 type Params = { params: Promise<{ id: string }> }
 
 export async function POST(_req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-  // Reivindicar uma fazenda órfã é prerrogativa do Gestor (assume responsabilidade)
-  if (session.role !== 'gestor') {
+  // P9: usa can() em vez de comparação direta de role
+  if (!can(session.role, 'farm.claim')) {
     return NextResponse.json({ error: 'Apenas Gestor pode reivindicar fazenda.' }, { status: 403 })
   }
 

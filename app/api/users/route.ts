@@ -3,6 +3,7 @@ import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { can, canManageUser, type Role } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
+import { withinLength, MAX_NAME_LENGTH, MAX_EMAIL_LENGTH } from '@/lib/validate'
 import bcrypt from 'bcryptjs'
 
 const VALID_NEW_ROLES: ReadonlyArray<Role> = ['admin', 'agronomo', 'operario']
@@ -45,14 +46,20 @@ export async function POST(req: NextRequest) {
   if (!name || !email || !password || !role) {
     return NextResponse.json({ error: 'Nome, e-mail, senha e cargo são obrigatórios.' }, { status: 400 })
   }
+  if (typeof name === 'string' && !withinLength(name, MAX_NAME_LENGTH)) {
+    return NextResponse.json({ error: `Nome excede ${MAX_NAME_LENGTH} caracteres.` }, { status: 400 })
+  }
+  if (typeof email === 'string' && !withinLength(email, MAX_EMAIL_LENGTH)) {
+    return NextResponse.json({ error: 'E-mail inválido.' }, { status: 400 })
+  }
   if (!VALID_NEW_ROLES.includes(role as Role)) {
     return NextResponse.json({ error: 'Cargo inválido.' }, { status: 400 })
   }
   if (!canManageUser(session.role, role as Role)) {
     return NextResponse.json({ error: 'Sem permissão para este cargo.' }, { status: 403 })
   }
-  if (typeof password !== 'string' || password.length < 6) {
-    return NextResponse.json({ error: 'Senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
+  if (typeof password !== 'string' || password.length < 8) {
+    return NextResponse.json({ error: 'Senha deve ter pelo menos 8 caracteres.' }, { status: 400 })
   }
 
   const supabase = createServerClient()

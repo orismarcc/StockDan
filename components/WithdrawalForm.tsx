@@ -140,27 +140,33 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
     }
 
     // Modo online: envia diretamente
-    const res = await fetch(`/api/farms/${farmId}/transactions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ insumo_id: insumoId, talhao_id: talhaoId, quantity: qty, date, notes, area_ha: areaPayload }),
-    })
+    try {
+      const res = await fetch(`/api/farms/${farmId}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ insumo_id: insumoId, talhao_id: talhaoId, quantity: qty, date, notes, area_ha: areaPayload }),
+      })
 
-    const data = await res.json()
-    setLoading(false)
-    submittingRef.current = false
+      const data = await res.json()
+      setLoading(false)
+      submittingRef.current = false
 
-    if (res.status === 401) {
-      router.push('/login')
-      return
+      if (res.status === 401) {
+        router.push('/login')
+        return
+      }
+      if (!res.ok) {
+        setError(data.error)
+        return
+      }
+
+      clearDraft()
+      router.push(`/farms/${farmId}`)
+    } catch {
+      setLoading(false)
+      submittingRef.current = false
+      setError('Erro de conexão. Verifique sua internet e tente novamente.')
     }
-    if (!res.ok) {
-      setError(data.error)
-      return
-    }
-
-    clearDraft()
-    router.push(`/farms/${farmId}`)
   }
 
   if (insumos.length === 0 || talhoes.length === 0) {
@@ -304,12 +310,13 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
 
         {/* Área aplicada (opcional) */}
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-400">
+          <label htmlFor="withdrawal-area-ha" className="text-sm font-medium text-gray-400">
             Área a ser aplicada
             <span className="ml-1.5 text-xs font-normal text-gray-600">(opcional — pode preencher após a operação)</span>
           </label>
           <div className="flex items-center gap-2">
             <input
+              id="withdrawal-area-ha"
               type="number"
               step="0.01"
               min="0.01"

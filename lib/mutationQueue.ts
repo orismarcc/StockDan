@@ -13,6 +13,14 @@
  * diferentes, entao ambos sao persistidos no servidor (comportamento correto).
  * Para UPDATE/DELETE da mesma linha, o servidor aplica LWW por updated_at_client
  * (cliente envia timestamp do momento da operacao).
+ *
+ * ── TTL (design consciente) ──────────────────────────────────────────────────
+ * Esta fila NÃO aplica TTL. Ao contrário de `offlineQueue` (retiradas de
+ * estoque que caducam após 24h para evitar aplicações de insumos desatualizadas),
+ * mutações genéricas (PATCH em regulagens, edições de nome, etc.) não têm
+ * urgência de prazo — aplica-las tarde é melhor do que descarta-las
+ * silenciosamente. Se necessário no futuro, adicionar TTL seletivo por `method`.
+ * Em caso de sessão expirada (401), `useSyncQueue` limpa a fila via `clear()`.
  */
 
 const QUEUE_KEY = 'stockdan_mutation_queue'

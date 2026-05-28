@@ -5,20 +5,9 @@ import { checkFarmAccess } from '@/lib/farmAccess'
 import { can } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
-import { isUUID } from '@/lib/validate'
+import { isUUID, parseClientTimestamp } from '@/lib/validate'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
-
-/** Valida timestamp do cliente: ISO válido, últimos 7 dias até +1 min. */
-function parseClientTimestamp(raw: unknown): string | null {
-  if (!raw || typeof raw !== 'string') return null
-  const ts = new Date(raw)
-  if (isNaN(ts.getTime())) return null
-  const now = Date.now()
-  if (ts.getTime() < now - 7 * 24 * 60 * 60 * 1000) return null
-  if (ts.getTime() > now + 60_000) return null
-  return ts.toISOString()
-}
 
 export async function POST(req: NextRequest, { params }: Params) {
   const session = await getActiveSession()

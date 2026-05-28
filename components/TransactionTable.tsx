@@ -11,6 +11,7 @@ export interface Transaction {
   date: string
   created_at: string
   notes: string | null
+  area_ha?: number | null
   insumos: { title: string; unit: string } | null
   talhoes: { id: string; name: string } | null
   users: { name: string } | null
@@ -41,8 +42,10 @@ export function TransactionTable({
   const [deleteError, setDeleteError] = useState('')
   const [page, setPage] = useState(0)
 
-  // canEdit: quem tem transaction.edit ou transaction.delete pode ver ações
-  const canEdit = !!userRole && can(userRole, 'transaction.edit') && farmId && (onEdit || onDelete)
+  // Separado por capability: agrônomo pode editar mas não excluir transações
+  const canEditTx   = !!userRole && can(userRole, 'transaction.edit')  && !!farmId && !!onEdit
+  const canDeleteTx = !!userRole && can(userRole, 'transaction.delete') && !!farmId && !!onDelete
+  const canEdit     = canEditTx || canDeleteTx  // controla visibilidade da coluna/seção
   const totalPages = Math.ceil(transactions.length / pageSize)
   const paginated = transactions.slice(page * pageSize, (page + 1) * pageSize)
 
@@ -178,18 +181,22 @@ export function TransactionTable({
                   </>
                 ) : (
                   <>
-                    <button
-                      onClick={() => onEdit?.(tx)}
-                      className="flex-1 rounded-lg border border-gray-700 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 transition-colors"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(tx.id)}
-                      className="flex-1 rounded-lg border border-red-500/20 py-2 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
-                    >
-                      Excluir
-                    </button>
+                    {canEditTx && (
+                      <button
+                        onClick={() => onEdit?.(tx)}
+                        className="flex-1 rounded-lg border border-gray-700 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 transition-colors"
+                      >
+                        Editar
+                      </button>
+                    )}
+                    {canDeleteTx && (
+                      <button
+                        onClick={() => setConfirmDeleteId(tx.id)}
+                        className="flex-1 rounded-lg border border-red-500/20 py-2 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+                      >
+                        Excluir
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -260,18 +267,22 @@ export function TransactionTable({
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-2">
-                        <button
-                          onClick={() => onEdit?.(tx)}
-                          className="inline-flex items-center rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(tx.id)}
-                          className="inline-flex items-center rounded-md border border-red-500/20 bg-red-500/5 px-2.5 py-1 text-xs font-medium text-red-500 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                        >
-                          Excluir
-                        </button>
+                        {canEditTx && (
+                          <button
+                            onClick={() => onEdit?.(tx)}
+                            className="inline-flex items-center rounded-md border border-gray-700 bg-gray-800/60 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 hover:bg-gray-700 hover:text-gray-100 transition-colors"
+                          >
+                            Editar
+                          </button>
+                        )}
+                        {canDeleteTx && (
+                          <button
+                            onClick={() => setConfirmDeleteId(tx.id)}
+                            className="inline-flex items-center rounded-md border border-red-500/20 bg-red-500/5 px-2.5 py-1 text-xs font-medium text-red-500 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                          >
+                            Excluir
+                          </button>
+                        )}
                       </span>
                     )}
                   </td>

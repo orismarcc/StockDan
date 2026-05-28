@@ -50,8 +50,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const notes = trimField(body.notes)
   const updated_at_client = body.updated_at_client ?? null
 
-  // ── Atualização de área aplicada (qualquer usuário com acesso à fazenda) ────
-  // Não toca no estoque — sem necessidade de RPC.
+  // ── Atualização de área aplicada ─────────────────────────────────────────────
+  // Decisão de design consciente: qualquer usuário com acesso à fazenda pode
+  // registrar a área aplicada de uma retirada (sem tocar no estoque).
+  // Operário registra a área no campo após aplicar — faz sentido operacionalmente.
+  // Não há RPC pois não há efeito colateral em estoque.
+  // Documentado como 'transaction.area_ha.edit' (implícito em 'transaction.saida').
   if (area_ha !== undefined && quantity === undefined && date === undefined) {
     if (!isValidAreaHa(area_ha)) {
       return NextResponse.json({ error: 'Área deve ser maior que zero (máx. 9.999.999 ha).' }, { status: 400 })

@@ -11,6 +11,7 @@ export type Action =
   | 'farm.create'
   | 'farm.edit'
   | 'farm.delete'
+  | 'farm.claim'
   | 'talhao.write'
   | 'talhao.delete'
   | 'insumo.write'
@@ -34,6 +35,8 @@ const MATRIX: Record<Action, ReadonlyArray<Role>> = {
   // Criação / edição: gestor + admin + agrônomo (rotina operacional)
   'farm.create':         ['gestor', 'admin'],
   'farm.edit':           ['gestor', 'admin', 'agronomo'],
+  // Claim: vinculação de fazenda ao tenant — exclusivo do gestor (onboarding)
+  'farm.claim':          ['gestor'],
   'talhao.write':        ['gestor', 'admin', 'agronomo'],
   'insumo.write':        ['gestor', 'admin', 'agronomo'],
   'adjustment.write':    ['gestor', 'admin', 'agronomo'],

@@ -22,9 +22,19 @@ interface Talhao {
   area_ha: number
 }
 
+interface Insumo {
+  id: string
+  title: string
+  unit: string
+  quantity: number
+  min_quantity?: number | null
+  description?: string | null
+  updated_at?: string | null
+}
+
 interface FarmTabsProps {
   farm: { id: string; name: string }
-  insumos: any[]
+  insumos: Insumo[]
   talhoes: Talhao[]
   transactions: Transaction[]
   userRole: Role
@@ -53,8 +63,8 @@ export function FarmTabs({ farm, insumos, talhoes, transactions, userRole }: Far
       const insumoTitle = tx.insumos.title
       const qty = Number(tx.quantity)
       const qtyKg = qty
-      const areaHa = (tx as any).area_ha != null && Number((tx as any).area_ha) > 0
-        ? Number((tx as any).area_ha) : 0
+      const areaHa = tx.area_ha != null && Number(tx.area_ha) > 0
+        ? Number(tx.area_ha) : 0
       if (!result[tid]) result[tid] = {}
       if (!result[tid][insumoTitle]) result[tid][insumoTitle] = { accumArea: 0, totalQtyKg: 0, txCount: 0 }
       result[tid][insumoTitle].accumArea += areaHa

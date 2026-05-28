@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
+import { can } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
 
 type Params = { params: Promise<{ id: string; adjId: string }> }
@@ -9,6 +10,9 @@ type Params = { params: Promise<{ id: string; adjId: string }> }
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  if (!can(session.role, 'adjustment.write')) {
+    return NextResponse.json({ error: 'Sem permissão para editar regulagem.' }, { status: 403 })
+  }
 
   const { id: farm_id, adjId } = await params
   const supabase = createServerClient()
@@ -82,6 +86,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  if (!can(session.role, 'adjustment.delete')) {
+    return NextResponse.json({ error: 'Sem permissão para excluir regulagem.' }, { status: 403 })
+  }
 
   const { id: farm_id, adjId } = await params
   const supabase = createServerClient()

@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode, useEffect, useId, useRef } from 'react'
 
 const FOCUSABLE = [
   'a[href]',
@@ -22,6 +22,9 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, className }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  // useId gera ID único por instância de Modal — evita IDs duplicados se dois modais
+  // forem renderizados simultaneamente (importante para aria-labelledby ser correto).
+  const titleId = useId()
 
   useEffect(() => {
     if (!open) return
@@ -73,14 +76,14 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
         className={cn(
           'relative z-10 w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 shadow-2xl fade-in overflow-y-auto max-h-[90dvh]',
           className
         )}
       >
         <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
-          <h2 id="modal-title" className="text-base font-semibold text-gray-100 pr-2 leading-snug">{title}</h2>
+          <h2 id={titleId} className="text-base font-semibold text-gray-100 pr-2 leading-snug">{title}</h2>
           <button
             onClick={onClose}
             className="rounded-lg p-2 text-gray-500 hover:bg-gray-800 hover:text-gray-300 transition-colors"

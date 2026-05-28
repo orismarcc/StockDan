@@ -1,4 +1,4 @@
-const CACHE = 'stockdan-v4'
+const CACHE = 'stockdan-v5'
 
 // Shell do app — carregado na instalação do SW
 const PRECACHE = [

@@ -4,18 +4,31 @@ import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { formatDate } from '@/lib/utils'
+import { can, roleLabel } from '@/lib/permissions'
 
 export const metadata = { title: 'Usuários' }
 
+function roleBadgeClass(role: string): string {
+  switch (role) {
+    case 'gestor':   return 'border-amber-500/20 bg-amber-500/10 text-amber-400'
+    case 'admin':    return 'border-green-500/20 bg-green-500/10 text-green-400'
+    case 'agronomo': return 'border-blue-500/20 bg-blue-500/10 text-blue-400'
+    default:         return 'border-gray-700 bg-gray-800 text-gray-400'
+  }
+}
+
 export default async function UsersPage() {
   const session = await getSession()
-  if (!session || session.role !== 'admin') redirect('/dashboard')
+  if (!session) redirect('/login')
+  if (!can(session.role, 'user.list')) redirect('/dashboard')
 
   const supabase = createServerClient()
+  // P8: lista todos os users do tenant, exceto o próprio
   const { data: users } = await supabase
     .from('users')
     .select('id, name, email, role, must_change_password, created_at')
-    .eq('created_by', session.id)
+    .eq('gestor_id', session.gestor_id)
+    .neq('id', session.id)
     .order('name')
 
   return (
@@ -45,12 +58,8 @@ export default async function UsersPage() {
                 <p className="font-medium text-gray-200 truncate">{user.name}</p>
                 <p className="mt-0.5 text-xs text-gray-500 truncate">{user.email}</p>
               </div>
-              <span className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
-                user.role === 'admin'
-                  ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                  : 'border-gray-700 bg-gray-800 text-gray-400'
-              }`}>
-                {user.role === 'admin' ? 'Admin' : 'Operador'}
+              <span className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${roleBadgeClass(user.role)}`}>
+                {roleLabel(user.role)}
               </span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-2">
@@ -98,12 +107,8 @@ export default async function UsersPage() {
                   <td className="px-4 py-3 font-medium text-gray-200">{user.name}</td>
                   <td className="px-4 py-3 text-gray-400">{user.email}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
-                      user.role === 'admin'
-                        ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                        : 'border-gray-700 bg-gray-800 text-gray-400'
-                    }`}>
-                      {user.role === 'admin' ? 'Admin' : 'Operador'}
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${roleBadgeClass(user.role)}`}>
+                      {roleLabel(user.role)}
                     </span>
                   </td>
                   <td className="px-4 py-3">

@@ -6,13 +6,16 @@ import Link from 'next/link'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
+import { roleLabel, type Role } from '@/lib/permissions'
+
+const ASSIGNABLE_ROLES: Role[] = ['admin', 'agronomo', 'operario']
 
 export default function NewUserPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const [form, setForm] = useState({
-    email: '', password: '', role: 'operario',
+    name: '', email: '', password: '', role: 'operario' as Role,
   })
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
@@ -50,12 +53,19 @@ export default function NewUserPage() {
         </Link>
         <h1 className="text-2xl font-bold text-gray-100">Novo Usuário</h1>
         <p className="mt-1 text-sm text-gray-500">
-          O usuário definirá seu nome completo e senha no primeiro acesso.
+          O usuário será obrigado a redefinir a senha no primeiro acesso.
         </p>
       </div>
 
       <div className="max-w-xl rounded-xl border border-gray-800 bg-gray-900 p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <Input
+            label="Nome *"
+            placeholder="João da Silva"
+            value={form.name}
+            onChange={(e) => set('name', e.target.value)}
+            required
+          />
           <Input
             label="E-mail *"
             type="email"
@@ -70,16 +80,18 @@ export default function NewUserPage() {
             placeholder="Mínimo 6 caracteres"
             value={form.password}
             onChange={(e) => set('password', e.target.value)}
-            hint="O usuário definirá seu nome e criará uma nova senha no primeiro acesso"
+            hint="O usuário será forçado a criar uma nova senha no primeiro acesso"
             required
           />
           <Select
-            label="Perfil *"
+            label="Cargo *"
             value={form.role}
-            onChange={(e) => set('role', e.target.value)}
+            onChange={(e) => set('role', e.target.value as Role)}
+            hint="Admin: gestão completa (exceto excluir Gestor). Agrônomo: opera fazenda sem deletar/criar users. Operário: só registra retiradas."
           >
-            <option value="operario">Operador</option>
-            <option value="admin">Administrador</option>
+            {ASSIGNABLE_ROLES.map((r) => (
+              <option key={r} value={r}>{roleLabel(r)}</option>
+            ))}
           </Select>
 
           {error && (

@@ -19,7 +19,7 @@ interface TransactionTableProps {
   transactions: Transaction[]
   showInsumo?: boolean
   farmId?: string
-  userRole?: 'admin' | 'operario'
+  userRole?: import('@/lib/permissions').Role
   talhoes?: { id: string; name: string; area_ha: number }[]
   onEdit?: (tx: Transaction) => void
   onDelete?: (txId: string) => void
@@ -40,7 +40,8 @@ export function TransactionTable({
   const [deleteError, setDeleteError] = useState('')
   const [page, setPage] = useState(0)
 
-  const canEdit = userRole === 'admin' && farmId && (onEdit || onDelete)
+  // canEdit: Gestor, Admin, Agrônomo podem editar/excluir transações (operário não)
+  const canEdit = !!userRole && userRole !== 'operario' && farmId && (onEdit || onDelete)
   const totalPages = Math.ceil(transactions.length / pageSize)
   const paginated = transactions.slice(page * pageSize, (page + 1) * pageSize)
 

@@ -6,6 +6,7 @@ import { Input } from './ui/Input'
 import { Select } from './ui/Select'
 import { Button } from './ui/Button'
 import { cn } from '@/lib/utils'
+import { roleLabel, type Role } from '@/lib/permissions'
 
 interface UserEditorProps {
   user: { id: string; name: string; email: string; role: string; must_change_password: boolean }
@@ -14,10 +15,13 @@ interface UserEditorProps {
   currentUserId: string
 }
 
+// Gestor nunca é criado/editado via UI — só admins originais são gestores.
+const ASSIGNABLE_ROLES: Role[] = ['admin', 'agronomo', 'operario']
+
 export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: UserEditorProps) {
   const router = useRouter()
   const [name, setName]         = useState(user.name)
-  const [role, setRole]         = useState(user.role)
+  const [role, setRole]         = useState<string>(user.role)
   const [password, setPassword] = useState('')
   const [farms, setFarms]       = useState<string[]>(assignedFarmIds)
   const [saving, setSaving]     = useState(false)
@@ -26,6 +30,7 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
   const [success, setSuccess]   = useState('')
 
   const roleChanged = role !== user.role
+  const isGestor = user.role === 'gestor'
 
   function toggleFarm(id: string) {
     setFarms((prev) =>
@@ -39,9 +44,11 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
     setSuccess('')
     setSaving(true)
 
-    const body: Record<string, unknown> = { name, role }
+    const body: Record<string, unknown> = { name }
+    if (!isGestor) body.role = role
     if (password) body.password = password
-    if (role === 'operario') body.farm_ids = farms
+    // Todos os cargos não-gestor são vinculados explicitamente a fazendas
+    if (!isGestor) body.farm_ids = farms
 
     const res = await fetch(`/api/users/${user.id}`, {
       method: 'PUT',
@@ -55,7 +62,7 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
     if (!res.ok) { setError(data.error); return }
     setSuccess(
       roleChanged
-        ? `Cargo alterado para ${role === 'admin' ? 'Administrador' : 'Operador'}. O usuário precisará fazer login novamente para que a mudança tenha efeito.`
+        ? `Cargo alterado para ${roleLabel(role)}. O usuário precisará fazer login novamente.`
         : 'Alterações salvas com sucesso.'
     )
     setPassword('')
@@ -80,24 +87,30 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
         <h2 className="mb-5 text-sm font-semibold text-gray-400 uppercase tracking-wider">Dados do Usuário</h2>
         <form onSubmit={handleSave} className="flex flex-col gap-5">
           <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} required />
+
           <div>
             <Select
               label="Cargo"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              disabled={user.id === currentUserId}
+              disabled={user.id === currentUserId || isGestor}
               hint={
                 user.id === currentUserId
                   ? 'Você não pode alterar seu próprio cargo.'
+                  : isGestor
+                  ? 'Gestor não pode ter o cargo alterado pela UI.'
                   : roleChanged
-                  ? `Será alterado de ${user.role === 'admin' ? 'Administrador' : 'Operador'} para ${role === 'admin' ? 'Administrador' : 'Operador'}. O usuário precisará relogar.`
-                  : 'Administrador gerencia fazendas, insumos e usuários. Operador apenas registra retiradas.'
+                  ? `Será alterado de ${roleLabel(user.role)} para ${roleLabel(role)}. O usuário precisará relogar.`
+                  : 'Admin: gestão completa. Agrônomo: opera fazenda sem deletar/criar users. Operário: só registra retiradas.'
               }
             >
-              <option value="operario">Operador</option>
-              <option value="admin">Administrador</option>
+              {isGestor && <option value="gestor">{roleLabel('gestor')}</option>}
+              {ASSIGNABLE_ROLES.map((r) => (
+                <option key={r} value={r}>{roleLabel(r)}</option>
+              ))}
             </Select>
           </div>
+
           <Input
             label="Nova Senha"
             type="password"
@@ -114,12 +127,12 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
         </form>
       </div>
 
-      {/* Fazendas vinculadas (apenas operários) */}
-      {role === 'operario' && allFarms.length > 0 && (
+      {/* Fazendas vinculadas (admin/agrônomo/operário — gestor é dono direto, não precisa de farm_users) */}
+      {!isGestor && allFarms.length > 0 && (
         <div className="rounded-xl border border-gray-800 bg-gray-900 p-6">
           <h2 className="mb-1 text-sm font-semibold text-gray-400 uppercase tracking-wider">Fazendas Vinculadas</h2>
           <p className="mb-4 text-xs text-gray-600">
-            Selecione as fazendas que este operador pode acessar.
+            Selecione as fazendas que este usuário pode acessar. Apenas fazendas do seu tenant aparecem aqui.
           </p>
           <div className="space-y-2">
             {allFarms.map((farm) => {
@@ -152,8 +165,8 @@ export function UserEditor({ user, allFarms, assignedFarmIds, currentUserId }: U
         </div>
       )}
 
-      {/* Excluir */}
-      {user.id !== currentUserId && (
+      {/* Excluir (não permite excluir Gestor pela UI nem self) */}
+      {user.id !== currentUserId && !isGestor && (
         <div className="rounded-xl border border-red-500/10 bg-red-500/5 p-5">
           <h2 className="mb-1 text-sm font-semibold text-red-400">Zona de Perigo</h2>
           <p className="mb-3 text-xs text-gray-500">Esta ação é irreversível.</p>

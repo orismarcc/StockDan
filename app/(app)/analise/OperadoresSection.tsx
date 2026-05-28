@@ -3,12 +3,13 @@
 
 import { useState } from 'react'
 import type { TxRow, OperatorOption, InsumoOption } from './types'
+import type { Role } from '@/lib/permissions'
 
 interface Props {
   transactions: TxRow[]
   operators: OperatorOption[]
   insumos: InsumoOption[]
-  currentUserRole: 'admin' | 'operario'
+  currentUserRole: Role
 }
 
 interface OperatorStats {
@@ -67,7 +68,7 @@ export function OperadoresSection({ transactions, operators, insumos, currentUse
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
       <h2 className="mb-4 text-sm font-semibold text-gray-400 uppercase tracking-wider">
-        {currentUserRole === 'admin' ? 'Desempenho dos Operadores' : 'Meu Desempenho'}
+        {currentUserRole !== 'operario' ? 'Desempenho dos Operadores' : 'Meu Desempenho'}
       </h2>
 
       {stats.length === 0 ? (
@@ -81,7 +82,7 @@ export function OperadoresSection({ transactions, operators, insumos, currentUse
                 className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-800/40 transition-colors"
                 onClick={() => setExpanded(expanded === op.id ? null : op.id)}
               >
-                {currentUserRole === 'admin' && i < 3 && (
+                {currentUserRole !== 'operario' && i < 3 && (
                   <span className="text-lg shrink-0">{MEDALS[i]}</span>
                 )}
                 {/* Avatar */}

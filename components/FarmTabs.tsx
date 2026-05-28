@@ -12,6 +12,7 @@ import { ConfirmDeleteButton } from './ConfirmDeleteButton'
 import { RegulagemModal } from './RegulagemModal'
 import { Button } from './ui/Button'
 import { useFarmPrefetch } from '@/hooks/useFarmPrefetch'
+import { can, type Role } from '@/lib/permissions'
 
 type TabId = 'talhoes' | 'insumos' | 'historico'
 
@@ -26,7 +27,7 @@ interface FarmTabsProps {
   insumos: any[]
   talhoes: Talhao[]
   transactions: Transaction[]
-  userRole: 'admin' | 'operario'
+  userRole: Role
   userId: string
 }
 
@@ -343,7 +344,7 @@ const TalhaoRow = memo(function TalhaoRow({
   farmId: string
   insumoStats: Record<string, { accumArea: number; totalQtyKg: number; txCount: number }>
   topInsumos: string[]
-  userRole: 'admin' | 'operario'
+  userRole: Role
   onDeleted: () => void
   onRegulagem: () => void
 }) {
@@ -431,7 +432,7 @@ const TalhaoCard = memo(function TalhaoCard({
   farmId: string
   insumoStats: Record<string, { accumArea: number; totalQtyKg: number; txCount: number }>
   topInsumos: string[]
-  userRole: 'admin' | 'operario'
+  userRole: Role
   onDeleted: () => void
   onRegulagem: () => void
 }) {
@@ -530,7 +531,7 @@ const InsumoRow = memo(function InsumoRow({
 }: {
   ins: any
   farmId: string
-  userRole: 'admin' | 'operario'
+  userRole: Role
   onAddStock: () => void
   onEditQty: () => void
   onDeleted: () => void
@@ -607,7 +608,7 @@ const InsumoCard = memo(function InsumoCard({
 }: {
   ins: any
   farmId: string
-  userRole: 'admin' | 'operario'
+  userRole: Role
   onAddStock: () => void
   onEditQty: () => void
   onDeleted: () => void

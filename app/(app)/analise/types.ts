@@ -1,5 +1,7 @@
 // app/(app)/analise/types.ts
 
+import type { Role } from '@/lib/permissions'
+
 export interface TxRow {
   id: string
   farm_id: string
@@ -43,5 +45,5 @@ export interface AnaliseData {
   transactions: TxRow[]
   operators: OperatorOption[]
   currentUserId: string
-  currentUserRole: 'admin' | 'operario'
+  currentUserRole: Role
 }

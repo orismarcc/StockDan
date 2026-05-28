@@ -3,21 +3,24 @@ import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { UserEditor } from '@/components/UserEditor'
+import { can } from '@/lib/permissions'
 
 export const metadata = { title: 'Gerenciar Usuário' }
 
 export default async function UserDetailPage({ params }: { params: Promise<{ uid: string }> }) {
   const session = await getSession()
-  if (!session || session.role !== 'admin') redirect('/dashboard')
+  if (!session) redirect('/login')
+  if (!can(session.role, 'user.edit')) redirect('/dashboard')
 
   const { uid } = await params
   const supabase = createServerClient()
 
+  // P8: target precisa estar no mesmo tenant (gestor_id)
   const { data: user } = await supabase
     .from('users')
     .select('id, name, email, role, must_change_password')
     .eq('id', uid)
-    .eq('created_by', session.id)
+    .eq('gestor_id', session.gestor_id)
     .single()
 
   if (!user) notFound()
@@ -27,7 +30,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ uid
     .select('farm_id')
     .eq('user_id', uid)
 
-  const { data: allFarms } = await supabase.from('farms').select('id, name, city, state').order('name')
+  // P8: SÓ fazendas do tenant atual (corrige o bug de cross-tenant)
+  const { data: allFarms } = await supabase
+    .from('farms')
+    .select('id, name, city, state')
+    .eq('owner_id', session.gestor_id)
+    .order('name')
 
   const assignedFarmIds = (farmLinks ?? []).map((f: any) => f.farm_id)
 

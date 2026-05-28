@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { ConnectionStatus } from './ConnectionStatus'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
+import type { Role } from '@/lib/permissions'
 
 interface AppShellProps {
-  role: 'admin' | 'operario'
+  role: Role
   userName: string
   children: React.ReactNode
 }

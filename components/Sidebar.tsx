@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { can, roleLabel, type Role } from '@/lib/permissions'
 
 interface SidebarProps {
-  role: 'admin' | 'operario'
+  role: Role
   userName: string
   isOpen?: boolean
   onClose?: () => void
@@ -114,33 +115,37 @@ export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProp
           label="Análise"
         />
 
-        {role === 'admin' && (
+        {(can(role, 'user.list') || can(role, 'farm.create')) && (
           <>
             <p className="mt-5 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-gray-600">
               Gestão
             </p>
-            <NavItem
-              href="/farms"
-              active={isActive('/farms')}
-              onClick={onClose}
-              icon={
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9" />
-                </svg>
-              }
-              label="Fazendas"
-            />
-            <NavItem
-              href="/admin/users"
-              active={isActive('/admin')}
-              onClick={onClose}
-              icon={
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                </svg>
-              }
-              label="Usuários"
-            />
+            {can(role, 'farm.create') && (
+              <NavItem
+                href="/farms"
+                active={isActive('/farms')}
+                onClick={onClose}
+                icon={
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9" />
+                  </svg>
+                }
+                label="Fazendas"
+              />
+            )}
+            {can(role, 'user.list') && (
+              <NavItem
+                href="/admin/users"
+                active={isActive('/admin')}
+                onClick={onClose}
+                icon={
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                  </svg>
+                }
+                label="Usuários"
+              />
+            )}
           </>
         )}
       </nav>
@@ -181,7 +186,7 @@ export function Sidebar({ role, userName, isOpen = false, onClose }: SidebarProp
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-200 truncate">{userName}</p>
-                <p className="text-xs text-gray-500">{role === 'admin' ? 'Administrador' : 'Operador'}</p>
+                <p className="text-xs text-gray-500">{roleLabel(role)}</p>
               </div>
               <svg
                 className={cn('h-3.5 w-3.5 shrink-0 text-gray-600 transition-transform', profileOpen && 'rotate-180')}

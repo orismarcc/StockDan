@@ -372,8 +372,8 @@ const TalhaoRow = memo(function TalhaoRow({
                 <div className="h-1.5 flex-1 rounded-full bg-gray-800 overflow-hidden">
                   <div className={cn('h-full rounded-full', pctBarColor(pct))} style={{ width: `${pct}%` }} />
                 </div>
-                <span className={cn('text-xs font-medium tabular-nums shrink-0 w-10 text-right', pctTextColor(pct))}>
-                  {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                <span className={cn('text-xs font-medium tabular-nums shrink-0 whitespace-nowrap text-right', pctTextColor(pct))}>
+                  {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% aplicados
                 </span>
               </div>
             ) : (
@@ -471,8 +471,8 @@ const TalhaoCard = memo(function TalhaoCard({
                 <div className="h-1.5 w-14 overflow-hidden rounded-full bg-gray-800">
                   <div className={cn('h-full rounded-full', pctBarColor(pct))} style={{ width: `${pct}%` }} />
                 </div>
-                <span className={cn('w-10 text-right text-xs font-medium tabular-nums', pctTextColor(pct))}>
-                  {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                <span className={cn('whitespace-nowrap text-right text-xs font-medium tabular-nums', pctTextColor(pct))}>
+                  {pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% aplicados
                 </span>
               </div>
             </div>

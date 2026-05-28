@@ -134,8 +134,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-  if (!can(session.role, 'transaction.edit')) {
-    return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
+  // P9: exclusão de transação restrita a Gestor/Admin (audita histórico)
+  if (!can(session.role, 'transaction.delete')) {
+    return NextResponse.json({ error: 'Sem permissão para excluir transação.' }, { status: 403 })
   }
 
   const { id: farm_id, tid } = await params

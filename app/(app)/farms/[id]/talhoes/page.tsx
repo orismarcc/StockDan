@@ -2,16 +2,23 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
+import { checkFarmAccess } from '@/lib/farmAccess'
+import { can } from '@/lib/permissions'
 import { TalhoesManager } from '@/components/TalhoesManager'
 
 export const metadata = { title: 'Talhões' }
 
 export default async function TalhoesPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
-  if (!session || session.role !== 'admin') redirect('/dashboard')
+  if (!session) redirect('/login')
+  // P9: gerenciar talhões = capability talhao.write (gestor/admin/agrônomo)
+  if (!can(session.role, 'talhao.write')) redirect('/dashboard')
 
   const { id: farmId } = await params
   const supabase = createServerClient()
+
+  // P7: precisa ter acesso à fazenda (tenant + farm_users)
+  if (!(await checkFarmAccess(supabase, session, farmId))) redirect('/dashboard')
 
   const [{ data: farm }, { data: talhoes }] = await Promise.all([
     supabase.from('farms').select('id, name').eq('id', farmId).single(),
@@ -36,7 +43,11 @@ export default async function TalhoesPage({ params }: { params: Promise<{ id: st
         <p className="mt-1 text-sm text-gray-500">Gerencie os talhões de {farm.name}</p>
       </div>
 
-      <TalhoesManager farmId={farmId} initialTalhoes={talhoes ?? []} />
+      <TalhoesManager
+        farmId={farmId}
+        initialTalhoes={talhoes ?? []}
+        canDelete={can(session.role, 'talhao.delete')}
+      />
     </div>
   )
 }

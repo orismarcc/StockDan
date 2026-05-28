@@ -402,7 +402,7 @@ const TalhaoRow = memo(function TalhaoRow({
           >
             Detalhes
           </Link>
-          {userRole !== 'operario' && (
+          {can(userRole, 'talhao.delete') && (
             <ConfirmDeleteButton
               onConfirm={async () => {
                 const res = await fetch(`/api/farms/${farmId}/talhoes/${t.id}`, { method: 'DELETE' })
@@ -504,7 +504,7 @@ const TalhaoCard = memo(function TalhaoCard({
           >
             Detalhes
           </Link>
-          {userRole !== 'operario' && (
+          {can(userRole, 'talhao.delete') && (
             <ConfirmDeleteButton
               onConfirm={async () => {
                 const res = await fetch(`/api/farms/${farmId}/talhoes/${t.id}`, { method: 'DELETE' })
@@ -581,7 +581,7 @@ const InsumoRow = memo(function InsumoRow({
           >
             Detalhe
           </Link>
-          {userRole !== 'operario' && (
+          {can(userRole, 'insumo.delete') && (
             <ConfirmDeleteButton
               onConfirm={async () => {
                 const res = await fetch(`/api/farms/${farmId}/insumos/${ins.id}`, { method: 'DELETE' })
@@ -658,7 +658,7 @@ const InsumoCard = memo(function InsumoCard({
         >
           Detalhe
         </Link>
-        {userRole !== 'operario' && (
+        {can(userRole, 'insumo.delete') && (
           <ConfirmDeleteButton
             onConfirm={async () => {
               const res = await fetch(`/api/farms/${farmId}/insumos/${ins.id}`, { method: 'DELETE' })

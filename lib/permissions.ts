@@ -12,34 +12,52 @@ export type Action =
   | 'farm.edit'
   | 'farm.delete'
   | 'talhao.write'
+  | 'talhao.delete'
   | 'insumo.write'
+  | 'insumo.delete'
   | 'adjustment.write'
+  | 'adjustment.delete'
   | 'transaction.entrada'
   | 'transaction.saida'
   | 'transaction.edit'
+  | 'transaction.delete'
   | 'user.list'
   | 'user.create'
   | 'user.edit'
   | 'user.delete'
   | 'analysis.view'
   | 'analysis.export'
+  | 'audit.view'
+  | 'reports.schedule'
 
 const MATRIX: Record<Action, ReadonlyArray<Role>> = {
+  // Criação / edição: gestor + admin + agrônomo (rotina operacional)
   'farm.create':         ['gestor', 'admin'],
   'farm.edit':           ['gestor', 'admin', 'agronomo'],
-  'farm.delete':         ['gestor', 'admin'],
   'talhao.write':        ['gestor', 'admin', 'agronomo'],
   'insumo.write':        ['gestor', 'admin', 'agronomo'],
   'adjustment.write':    ['gestor', 'admin', 'agronomo'],
   'transaction.entrada': ['gestor', 'admin', 'agronomo'],
   'transaction.saida':   ['gestor', 'admin', 'agronomo', 'operario'],
   'transaction.edit':    ['gestor', 'admin', 'agronomo'],
+  // Exclusão: APENAS gestor + admin (ação destrutiva)
+  // Regulagem é parametrização leve → permanece amplo
+  'farm.delete':         ['gestor', 'admin'],
+  'talhao.delete':       ['gestor', 'admin'],
+  'insumo.delete':       ['gestor', 'admin'],
+  'adjustment.delete':   ['gestor', 'admin', 'agronomo'],
+  'transaction.delete':  ['gestor', 'admin'],
+  // Gestão de usuários
   'user.list':           ['gestor', 'admin'],
   'user.create':         ['gestor', 'admin'],
   'user.edit':           ['gestor', 'admin'],
   'user.delete':         ['gestor', 'admin'],
+  // Análise / relatórios
   'analysis.view':       ['gestor', 'admin', 'agronomo'],
   'analysis.export':     ['gestor', 'admin', 'agronomo'],
+  // Auditoria + relatórios agendados (governança do tenant)
+  'audit.view':          ['gestor', 'admin'],
+  'reports.schedule':    ['gestor', 'admin'],
 }
 
 /** Retorna true se o cargo `role` pode executar `action`. */

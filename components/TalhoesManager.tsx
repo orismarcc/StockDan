@@ -14,9 +14,11 @@ interface Talhao {
 interface TalhoesManagerProps {
   farmId: string
   initialTalhoes: Talhao[]
+  /** Se false, esconde o botão Excluir (Agrônomo pode editar mas não excluir) */
+  canDelete?: boolean
 }
 
-export function TalhoesManager({ farmId, initialTalhoes }: TalhoesManagerProps) {
+export function TalhoesManager({ farmId, initialTalhoes, canDelete = false }: TalhoesManagerProps) {
   const router = useRouter()
   const [talhoes, setTalhoes]       = useState(initialTalhoes)
   const [showForm, setShowForm]     = useState(false)
@@ -147,7 +149,9 @@ export function TalhoesManager({ farmId, initialTalhoes }: TalhoesManagerProps) 
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-3">
                           <button onClick={() => startEdit(t)} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Editar</button>
-                          <button onClick={() => handleDelete(t.id)} className="text-xs text-red-500/70 hover:text-red-400 transition-colors">Excluir</button>
+                          {canDelete && (
+                            <button onClick={() => handleDelete(t.id)} className="text-xs text-red-500/70 hover:text-red-400 transition-colors">Excluir</button>
+                          )}
                         </div>
                       </td>
                     </>

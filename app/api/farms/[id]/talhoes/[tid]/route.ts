@@ -61,8 +61,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-  if (!can(session.role, 'talhao.write')) {
-    return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
+  // P9: exclusão de talhão é restrita a Gestor/Admin (ação destrutiva)
+  if (!can(session.role, 'talhao.delete')) {
+    return NextResponse.json({ error: 'Sem permissão para excluir talhão.' }, { status: 403 })
   }
 
   const { id: farm_id, tid } = await params

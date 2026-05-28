@@ -130,8 +130,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await getActiveSession()
   if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-  if (!can(session.role, 'insumo.write')) {
-    return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
+  // P9: exclusão de insumo é restrita a Gestor/Admin
+  if (!can(session.role, 'insumo.delete')) {
+    return NextResponse.json({ error: 'Sem permissão para excluir insumo.' }, { status: 403 })
   }
 
   const { id: farm_id, iid } = await params

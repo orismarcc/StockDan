@@ -90,6 +90,30 @@ Operações puramente administrativas (CRUD de usuários, cadastrar fazenda, ger
 - Mudança de role: incrementa `token_version` do alvo + `invalidateTokenVersionCache(targetId)` (P5 reuso)
 - 4 cargos: `gestor` (root do tenant), `admin`, `agronomo`, `operario`
 
+### P10 — withAuth HOF para todo route handler novo
+
+**Todo route handler novo DEVE ser criado com `withAuth` em vez de chamar `getActiveSession()` manualmente.**
+
+- `lib/withAuth.ts`: HOF que garante sessão ativa antes de executar o handler
+- Retorna 401 automaticamente se não autenticado — handler nunca recebe request sem sessão
+- Handlers existentes (criados antes de P10) mantêm o padrão antigo — não refatorar sem necessidade
+- Fail-safe: se esquecer de usar `withAuth`, o `proxy.ts` ainda bloqueia requests sem token (P10 é defesa em profundidade, não única camada)
+
+```ts
+// NOVO padrão (use sempre em novas rotas)
+export const GET = withAuth(async (req, session) => { ... })
+export const POST = withAuth(async (req, session) => { ... })
+
+// Com params de URL
+export const DELETE = withAuth<{ id: string }>(async (req, session, params) => {
+  const { id } = await params!
+  if (!can(session.role, 'farm.delete')) {
+    return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 })
+  }
+  // ...
+})
+```
+
 ---
 
 ## Templates de código
@@ -98,19 +122,17 @@ Operações puramente administrativas (CRUD de usuários, cadastrar fazenda, ger
 
 ```ts
 import { NextRequest, NextResponse } from 'next/server'
-import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { isUUID } from '@/lib/validate'
+import { withAuth } from '@/lib/withAuth'
 
-type Params = { params: Promise<{ id: string }> }
+type Params = { id: string }
 
-export async function POST(req: NextRequest, { params }: Params) {
-  const session = await getActiveSession()
-  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-
-  const { id: farm_id } = await params
+// P10: withAuth garante sessão — handler nunca roda sem autenticação
+export const POST = withAuth<Params>(async (req, session, paramsPromise) => {
+  const { id: farm_id } = await paramsPromise!
   const supabase = createServerClient()
 
   if (!(await checkFarmAccess(supabase, session, farm_id))) {
@@ -279,23 +301,19 @@ export function MyForm({ farmId, ...props }: Props) {
 
 ```ts
 import { NextRequest, NextResponse } from 'next/server'
-import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { can, canManageUser } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
+import { withAuth } from '@/lib/withAuth'
 
-type Params = { params: Promise<{ uid: string }> }
-
-export async function PATCH(req: NextRequest, { params }: Params) {
-  const session = await getActiveSession()
-  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-
+// P10: withAuth garante sessão antes de qualquer lógica
+export const PATCH = withAuth<{ uid: string }>(async (req, session, paramsPromise) => {
   // P9: capability check
   if (!can(session.role, 'user.edit')) {
     return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
   }
 
-  const { uid } = await params
+  const { uid } = await paramsPromise!
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
 
@@ -383,6 +401,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tabela_offline_id
 | POST sem `offline_id` quando pode vir do offline ou retry | Sempre incluir, mesmo online |
 | PATCH sem `updated_at_client` em entidade multi-user | Sempre incluir + LWW no servidor |
 | `getSession()` em route que precisa bloquear `mustChangePassword` | `getActiveSession()` |
+| `getActiveSession()` manual em route handler novo | `withAuth(async (req, session) => { ... })` (P10) |
 | Claim "deploy ok" sem ver `● Ready` | Esperar Vercel ready |
 | Commit sem TSC passar | `npx tsc --noEmit` primeiro |
 | Migration sem `IF NOT EXISTS` | Sempre idempotente |
@@ -439,7 +458,9 @@ stockdan-app/
 │   ├── mutationQueue.ts    [genérica] Outras mutations
 │   ├── insumoCache.ts
 │   ├── syncLock.ts
-│   └── rateLimiter.ts
+│   ├── rateLimiter.ts      Rate limit via Upstash Redis (global entre Lambdas)
+│   ├── withAuth.ts         P10: HOF de autenticação para route handlers
+│   └── audit.ts            logAudit() — fire-and-forget para audit_log
 ├── public/sw.js, manifest.json, icons/
 ├── scripts/migrate.js, generate-pwa-icons.mjs
 ├── supabase/migrations/    SQL incremental
@@ -448,5 +469,5 @@ stockdan-app/
 
 ---
 
-**Última atualização:** 2026-05-27 — P8 (multi-tenant por Gestor) + P9 (capability matrix) após hierarquia de cargos.
+**Última atualização:** 2026-05-29 — P10 (withAuth HOF), rate limiter global Upstash Redis (SEG-1), A-2/A-3 confirmados resolvidos por parseBody + mensagens genéricas.
 **Próxima revisão:** sempre que adicionar nova categoria de operação OU novo cargo.

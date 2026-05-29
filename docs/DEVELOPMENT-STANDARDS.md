@@ -58,11 +58,45 @@ Operações puramente administrativas (CRUD de usuários, cadastrar fazenda, ger
 - `verifyTokenStrict` compara JWT.tv contra DB.token_version (cache 30s para perf)
 - Mutation que muda role: `UPDATE users SET token_version = token_version + 1` + `invalidateTokenVersionCache(uid)`
 
+**Regra obrigatória — `getSession()` vs `getActiveSession()`:**
+
+| Função | O que faz | Onde usar |
+|---|---|---|
+| `getActiveSession()` | Valida sessão E retorna null se `mustChangePassword=true` | **Todos** os API routes com dados reais |
+| `getSession()` | Valida sessão apenas (ignora mustChangePassword) | Somente `/api/auth/change-password`, `/api/auth/logout` e `generateMetadata` |
+
+```ts
+// ✅ Correto — API routes comuns
+const session = await getActiveSession()
+if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+
+// ✅ Correto — generateMetadata (não bloqueia, só lê título)
+export async function generateMetadata() {
+  const session = await getSession()
+  if (!session) return { title: 'StockDan' }
+  // ...
+}
+
+// ❌ Errado — usar getSession() em route com dados sensíveis
+// Usuário com mustChangePassword consegue acessar dados
+```
+
 ### P6 — Validação no servidor, sem confiar no cliente
 
 - `lib/validate.ts`: `isUUID`, `isValidDate`, `isValidQuantity`, `withinLength`, `trimField`, `isValidAreaHa`
 - `parseBody(req)` retorna `null` se body inválido → responda 400 `{error: 'Requisição inválida.'}`
 - NUNCA exponha `error.message` do Supabase ao cliente (vaza schema). Use `parseRpcError` ou `{error: 'Erro interno. Tente novamente.'}` 500
+
+**Regra obrigatória — verificação de colunas antes de qualquer SELECT:**
+
+Antes de escrever `supabase.from('tabela').select('col1, col2')`, verifique que as colunas existem em `supabase/schema.sql`. Selecionar coluna inexistente faz o Supabase retornar `error` → `data = null` silenciosamente, sem exceção, causando bugs difíceis de rastrear (ex: `data = null` onde se espera lista → 0 itens exibidos).
+
+```ts
+// ANTES de escrever isso:
+supabase.from('talhoes').select('id, name, area_ha, description, updated_at')
+// Verifique no schema: talhoes tem 'description'? tem 'updated_at'?
+// Se não tiver → Supabase retorna null sem aviso → bug silencioso
+```
 
 ### P7 — Controle de acesso por fazenda
 
@@ -90,6 +124,8 @@ Operações puramente administrativas (CRUD de usuários, cadastrar fazenda, ger
 - Mudança de role: incrementa `token_version` do alvo + `invalidateTokenVersionCache(targetId)` (P5 reuso)
 - 4 cargos: `gestor` (root do tenant), `admin`, `agronomo`, `operario`
 
+**Manutenção do `proxy.ts`:** quando adicionar novo cargo privilegiado ou nova rota admin-only, atualizar `adminOnlyPaths` E o array de roles permitidos no `proxy.ts`. Esquecer isso bloqueia o cargo correto de acessar rotas que deveria.
+
 ### P10 — withAuth HOF para todo route handler novo
 
 **Todo route handler novo DEVE ser criado com `withAuth` em vez de chamar `getActiveSession()` manualmente.**
@@ -113,6 +149,53 @@ export const DELETE = withAuth<{ id: string }>(async (req, session, params) => {
   // ...
 })
 ```
+
+### P11 — Audit log para ações destrutivas e sensíveis
+
+**Toda ação irreversível ou sensível DEVE chamar `logAudit()` após executar com sucesso.**
+
+Regra de quando logar:
+
+| Ação | Logar? |
+|---|---|
+| DELETE de qualquer entidade (fazenda, talhão, insumo) | ✅ Sim |
+| PATCH/DELETE de usuário (inclui mudança de role) | ✅ Sim |
+| Criação de usuário | ✅ Sim |
+| Criação de fazenda/talhão/insumo | ❌ Não (não é ação de governança) |
+| Registro de aplicação/regulagem | ❌ Não (dado operacional) |
+
+```ts
+// Sempre APÓS a operação ter sucesso (não antes)
+await logAudit(supabase, session, {
+  action: 'delete',          // 'create' | 'update' | 'delete'
+  entity: 'talhao',          // 'farm' | 'talhao' | 'insumo' | 'transaction' | 'adjustment' | 'user'
+  entity_id: tid,
+  farm_id: farm_id,          // null se não relacionado a fazenda
+  summary: `Excluiu talhão "${name}" (${area_ha} ha)`,
+  changes: { before: snap }, // snapshot opcional do estado anterior
+})
+```
+
+- `logAudit` é fire-and-forget — falha de log NÃO falha a operação principal
+- Filtra por `gestor_id` automaticamente via `session.gestor_id`
+- Visível em `/admin/audit` apenas para cargos `gestor` e `admin`
+
+### P12 — Security headers HTTP
+
+**Todo response da aplicação deve incluir headers de segurança configurados em `next.config.ts`.**
+
+Headers ativos (configurados via `headers()` no `next.config.ts`):
+
+| Header | Valor | Proteção |
+|---|---|---|
+| `X-Frame-Options` | `DENY` | Clickjacking |
+| `X-Content-Type-Options` | `nosniff` | MIME sniffing |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Leak de URL |
+| `Permissions-Policy` | desativa câmera/microfone/localização | API abuse |
+| `Content-Security-Policy` | restritivo com allowlist | XSS |
+
+**Nunca remover ou enfraquecer estes headers sem revisão de segurança.**
+Se uma feature nova precisar relaxar a CSP (ex: embeds externos), discutir antes — geralmente há alternativa.
 
 ---
 
@@ -177,14 +260,17 @@ export const POST = withAuth<Params>(async (req, session, paramsPromise) => {
   }
 
   return NextResponse.json(data, { status: 201 })
-}
+})
 ```
 
 ### Template — API Route PATCH com LWW
 
 ```ts
-export async function PATCH(req: NextRequest, { params }: Params) {
-  // ... auth + access check ...
+export const PATCH = withAuth<{ id: string }>(async (req, session, paramsPromise) => {
+  const { id } = await paramsPromise!
+  const supabase = createServerClient()
+
+  // ... checkFarmAccess + capability check ...
 
   const body = await parseBody(req)
   if (!body) return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 })
@@ -196,7 +282,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { data: current } = await supabase
       .from('TABLE')
       .select('*')
-      .eq('id', xid)
+      .eq('id', id)
       .eq('farm_id', farm_id)
       .maybeSingle()
 
@@ -211,14 +297,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { data, error } = await supabase
     .from('TABLE')
     .update({ /* fields */, updated_at_client: updated_at_client || null })
-    .eq('id', xid)
+    .eq('id', id)
     .eq('farm_id', farm_id)
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json(data)
-}
+})
 ```
 
 ### Template — Client Form com suporte offline
@@ -343,7 +429,7 @@ export const PATCH = withAuth<{ uid: string }>(async (req, session, paramsPromis
 
   // ... resto da mutation ...
   // P5: se mudou role, incrementar token_version + invalidar cache
-}
+})
 ```
 
 ### Template — Migration
@@ -371,22 +457,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tabela_offline_id
 ## Checklist antes de commitar
 
 - [ ] `npx tsc --noEmit` → exit 0
-- [ ] Padrões P1-P7 respeitados (offline, idempotency, multi-user, RPC, auth, validação, access)
-- [ ] Mutation tem `offline_id` no schema + check no servidor
-- [ ] PATCH considera `updated_at_client` (se entidade pode ter conflito)
-- [ ] DELETE é idempotente
-- [ ] Validação de TODOS os campos do body
-- [ ] Mensagens de erro genéricas em 500 (sem `error.message` do Supabase)
-- [ ] Migration idempotente (`IF NOT EXISTS`, `OR REPLACE`)
+- [ ] Padrões P1-P12 respeitados
+- [ ] Colunas do SELECT verificadas contra `supabase/schema.sql` (P6)
+- [ ] Novas rotas usam `withAuth` (P10)
+- [ ] Ações destrutivas chamam `logAudit()` (P11)
+- [ ] Mutation tem `offline_id` no schema + check no servidor (P2)
+- [ ] PATCH considera `updated_at_client` se entidade pode ter conflito (P3)
+- [ ] DELETE é idempotente (P3)
+- [ ] Validação de TODOS os campos do body (P6)
+- [ ] Mensagens de erro genéricas em 500 — sem `error.message` do Supabase (P6)
+- [ ] Migration idempotente (`IF NOT EXISTS`, `OR REPLACE`) (P4)
+- [ ] Se adicionou novo cargo/rota privilegiada: `proxy.ts` atualizado (P9)
 - [ ] Build local opcional (`npx next build`) se mexeu em SW/manifest/favicon
 
 ## Checklist depois de commitar
 
 - [ ] `git push origin master`
-- [ ] `npx vercel ls --prod` até ver `● Ready`
+- [ ] Aguardar Vercel deploy → `● Ready` (via `npx vercel ls` ou dashboard)
 - [ ] Se `● Error`: investigar logs com `npx vercel logs URL` ou MCP `get_deployment_build_logs`
-- [ ] NÃO claim "feito" antes de `● Ready` em prod
-- [ ] Se mexeu em algo crítico: documentar caso de teste manual
+- [ ] NÃO afirmar "feito" antes de `● Ready` em produção
+- [ ] Se mexeu em algo crítico: rodar smoke test manual nas páginas afetadas
 
 ---
 
@@ -394,22 +484,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tabela_offline_id
 
 | ❌ Antipattern | ✅ Pattern correto |
 |---|---|
-| `await supabase.from(A).update()` + `await supabase.from(B).insert()` separados | RPC atômica em PL/pgSQL |
-| `error.message` do Supabase no response | `{error: 'Erro interno. Tente novamente.'}` 500 |
-| `await req.json()` direto | `parseBody(req)` que trata body inválido |
-| Form que faz `fetch` sem checar `useOnlineStatus` | Usar template offline-aware |
-| POST sem `offline_id` quando pode vir do offline ou retry | Sempre incluir, mesmo online |
-| PATCH sem `updated_at_client` em entidade multi-user | Sempre incluir + LWW no servidor |
-| `getSession()` em route que precisa bloquear `mustChangePassword` | `getActiveSession()` |
+| `await supabase.from(A).update()` + `await supabase.from(B).insert()` separados | RPC atômica em PL/pgSQL (P4) |
+| `error.message` do Supabase no response | `{error: 'Erro interno. Tente novamente.'}` 500 (P6) |
+| `await req.json()` direto | `parseBody(req)` com try-catch interno (P6) |
+| SELECT de coluna sem verificar schema | Verificar `supabase/schema.sql` antes (P6) |
+| Form que faz `fetch` sem checar `useOnlineStatus` | Usar template offline-aware (P1) |
+| POST sem `offline_id` quando pode vir do offline ou retry | Sempre incluir, mesmo online (P2) |
+| PATCH sem `updated_at_client` em entidade multi-user | Sempre incluir + LWW no servidor (P3) |
+| `getSession()` em route que precisa bloquear `mustChangePassword` | `getActiveSession()` (P5) |
+| `getActiveSession()` em `generateMetadata` | `getSession()` — metadata não bloqueia (P5) |
 | `getActiveSession()` manual em route handler novo | `withAuth(async (req, session) => { ... })` (P10) |
+| DELETE/PATCH sensível sem chamar `logAudit()` | `await logAudit(supabase, session, { ... })` (P11) |
+| Novo cargo privilegiado sem atualizar `proxy.ts` | Atualizar `adminOnlyPaths` e roles permitidos (P9) |
 | Claim "deploy ok" sem ver `● Ready` | Esperar Vercel ready |
 | Commit sem TSC passar | `npx tsc --noEmit` primeiro |
 | Migration sem `IF NOT EXISTS` | Sempre idempotente |
 | Skip hooks `--no-verify` | Investigar falha do hook |
-| `session.role === 'admin'` em route handler | `can(session.role, 'namespace.action')` |
-| Listar/filtrar por `created_by` | `WHERE gestor_id = session.gestor_id` |
-| Aceitar `farm_id` do body sem validar ownership | `SELECT FROM farms WHERE owner_id = session.gestor_id AND id IN (...)` |
-| Inserir user com `gestor_id` vindo do body | `gestor_id: session.gestor_id` sempre |
+| `session.role === 'admin'` em route handler | `can(session.role, 'namespace.action')` (P9) |
+| Listar/filtrar por `created_by` | `WHERE gestor_id = session.gestor_id` (P8) |
+| Aceitar `farm_id` do body sem validar ownership | `SELECT FROM farms WHERE owner_id = session.gestor_id AND id IN (...)` (P7) |
+| Inserir user com `gestor_id` vindo do body | `gestor_id: session.gestor_id` sempre (P8) |
 
 ---
 
@@ -417,12 +511,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tabela_offline_id
 
 1. **Já existe padrão em outro lugar?** Seguir 100%. Ex: novo CRUD = mesmo formato de `implement-adjustments`.
 2. **Operação de campo?** `mutationQueue` + migration `offline_id`/`updated_at_client` + form com `useOnlineStatus`.
-3. **Operação admin?** Online-only OK, mas `getActiveSession + role check + checkFarmAccess`.
+3. **Operação admin?** Online-only OK, mas `withAuth` + capability check + `checkFarmAccess`.
 4. **Mudou role/permissão?** Incrementar `token_version` + `invalidateTokenVersionCache`.
 5. **Criando endpoint que lista/edita usuários ou vincula fazendas?** Sempre `WHERE gestor_id = session.gestor_id` + validar ownership de `farm_ids` (P8).
 6. **Verificando se um cargo pode fazer X?** `can(role, 'namespace.action')` — nunca string comparison (P9).
-5. **Sentiu duplicação de código?** Mover para `lib/`. Componentes/routes pequenos.
-6. **Spec ambígua?** Perguntar antes de codar. Não inventar.
+7. **Ação destrutiva ou sensível?** Chamar `logAudit()` após sucesso (P11).
+8. **Sentiu duplicação de código?** Mover para `lib/`. Componentes/routes pequenos.
+9. **Spec ambígua?** Perguntar antes de codar. Não inventar.
+10. **Adicionando SELECT no Supabase?** Verificar todas as colunas em `supabase/schema.sql` antes (P6).
 
 ---
 
@@ -433,41 +529,63 @@ stockdan-app/
 ├── app/                    Next.js App Router
 │   ├── (auth)/             Login/change-password
 │   ├── (app)/              App principal
-│   │   ├── admin/users/
+│   │   ├── admin/          Auditoria, Usuários, Relatórios (gestor + admin)
 │   │   ├── dashboard/
 │   │   ├── farms/[id]/
 │   │   └── analise/
 │   ├── api/                REST endpoints
-│   │   ├── auth/
-│   │   ├── farms/
-│   │   ├── users/
-│   │   └── ping/
+│   │   ├── auth/           login, logout, change-password, refresh
+│   │   ├── farms/          CRUD fazendas + sub-recursos
+│   │   ├── users/          Gestão de usuários (tenant-scoped)
+│   │   ├── audit/          Leitura de audit_log (gestor/admin)
+│   │   ├── reports/        Relatórios agendados
+│   │   ├── analise/        Geração de PDF/Excel
+│   │   ├── cron/           Jobs agendados (send-reports)
+│   │   └── ping/           Health check (público)
 │   └── layout.tsx
+├── proxy.ts                Middleware Next.js 16 — auth fast-check + role guards
+│                           (⚠️ atualizar quando adicionar novos cargos/rotas admin)
+├── next.config.ts          Security headers HTTP (P12) + configuração Next.js
 ├── components/             React shared
 ├── hooks/
 │   ├── useOnlineStatus.ts
 │   └── useSyncQueue.ts     Drena offlineQueue + mutationQueue
 ├── lib/
-│   ├── auth.ts             JWT + token_version
+│   ├── auth.ts             JWT + token_version + getSession/getActiveSession
 │   ├── supabase.ts         Server client
-│   ├── farmAccess.ts       checkFarmAccess()
-│   ├── validate.ts         Validações
+│   ├── farmAccess.ts       checkFarmAccess() — P7
+│   ├── permissions.ts      can() + canManageUser() + roleLabel() — P9
+│   ├── validate.ts         Validações de domínio — P6
 │   ├── rpcErrors.ts        parseRpcError()
-│   ├── utils.ts            parseBody, formatadores
+│   ├── utils.ts            parseBody (com try-catch), formatadores
+│   ├── withAuth.ts         P10: HOF de autenticação para route handlers
+│   ├── audit.ts            logAudit() fire-and-forget — P11
+│   ├── rateLimiter.ts      Rate limit via Upstash Redis (global entre Lambdas)
 │   ├── offlineQueue.ts     [específica] Retiradas
 │   ├── mutationQueue.ts    [genérica] Outras mutations
 │   ├── insumoCache.ts
-│   ├── syncLock.ts
-│   ├── rateLimiter.ts      Rate limit via Upstash Redis (global entre Lambdas)
-│   ├── withAuth.ts         P10: HOF de autenticação para route handlers
-│   └── audit.ts            logAudit() — fire-and-forget para audit_log
+│   └── syncLock.ts
 ├── public/sw.js, manifest.json, icons/
 ├── scripts/migrate.js, generate-pwa-icons.mjs
-├── supabase/migrations/    SQL incremental
+├── supabase/
+│   ├── schema.sql          ← CONSULTAR antes de qualquer SELECT (P6)
+│   └── migrations/         SQL incremental idempotente
 └── docs/                   Auditorias + standards
 ```
 
 ---
 
-**Última atualização:** 2026-05-29 — P10 (withAuth HOF), rate limiter global Upstash Redis (SEG-1), A-2/A-3 confirmados resolvidos por parseBody + mensagens genéricas.
-**Próxima revisão:** sempre que adicionar nova categoria de operação OU novo cargo.
+**Última atualização:** 2026-05-29
+**Mudanças desta versão:**
+- P5: regra clara de `getSession()` vs `getActiveSession()` com tabela de uso (C-1, C-2)
+- P6: regra de verificação de colunas contra `supabase/schema.sql` (lição dos bugs de hoje)
+- P9: nota de manutenção do `proxy.ts` ao adicionar roles/rotas (lição dos bugs de hoje)
+- P10: `withAuth` HOF — padrão para novos route handlers (C-3)
+- P11: Audit log — regra de quando/o que registrar (SUG-4)
+- P12: Security headers HTTP — referência ao `next.config.ts` (A-4)
+- Checklist atualizado para P1-P12
+- Antipatterns: 5 novos itens adicionados
+- "Quando em dúvida": 4 novos itens, numeração corrigida
+- Arquitetura: `proxy.ts`, `next.config.ts`, `withAuth.ts`, `audit.ts`, `rateLimiter.ts` documentados
+
+**Próxima revisão:** sempre que adicionar nova categoria de operação, novo cargo ou nova camada de segurança.

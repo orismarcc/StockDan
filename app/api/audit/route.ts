@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
+import { withAuth } from '@/lib/withAuth'
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT     = 200
 
-export async function GET(req: NextRequest) {
-  const session = await getActiveSession()
-  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+export const GET = withAuth(async (req, session) => {
   if (!can(session.role, 'audit.view')) {
     return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
   }
@@ -44,4 +42,4 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data ?? [], {
     headers: { 'X-Total-Count': String(count ?? 0) },
   })
-}
+})

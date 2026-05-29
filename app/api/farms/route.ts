@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getActiveSession } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
 import { trimField, withinLength } from '@/lib/validate'
+import { withAuth } from '@/lib/withAuth'
 
-export async function GET() {
-  const session = await getActiveSession()
-  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-
+export const GET = withAuth(async (_req, session) => {
   const supabase = createServerClient()
 
   if (session.role === 'gestor') {
@@ -32,12 +29,10 @@ export async function GET() {
     .eq('farms.owner_id', session.gestor_id)
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-  return NextResponse.json(data.map((r: any) => r.farms))
-}
+  return NextResponse.json((data as any[]).map((r) => r.farms))
+})
 
-export async function POST(req: NextRequest) {
-  const session = await getActiveSession()
-  if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+export const POST = withAuth(async (req, session) => {
   if (!can(session.role, 'farm.create')) {
     return NextResponse.json({ error: 'Sem permissão para esta ação.' }, { status: 403 })
   }
@@ -70,4 +65,4 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   return NextResponse.json(data, { status: 201 })
-}
+})

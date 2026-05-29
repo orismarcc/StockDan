@@ -43,7 +43,7 @@ export default async function FarmPage({ params }: { params: Promise<{ id: strin
 
   const [{ data: insumos }, { data: talhoes }, { data: transactions }] = await Promise.all([
     supabase.from('insumos').select('id, farm_id, title, unit, quantity, min_quantity, description').eq('farm_id', id).order('title'),
-    supabase.from('talhoes').select('id, farm_id, name, area_ha, description').eq('farm_id', id).order('name'),
+    supabase.from('talhoes').select('id, farm_id, name, area_ha').eq('farm_id', id).order('name'),
     supabase
       .from('transactions')
       .select('*, insumos(title, unit), talhoes(id, name), users(name)')

@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export const metadata = undefined // client component, sem metadata
-
 export default function SettingsPage() {
   const router = useRouter()
 

@@ -37,10 +37,20 @@ async function getFarmsWithStats(userId: string, role: string, gestorId: string)
 
   const farmIds = farmsData.map((f) => f.id)
 
-  // Busca todos os insumos e talhões de todas as fazendas em 2 queries fixas
-  const [{ data: allInsumos }, { data: allTalhoes }] = await Promise.all([
+  // Data de 7 dias atrás para sparkline
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .toISOString().split('T')[0]
+
+  // 3 queries em paralelo: insumos, talhões e transações dos últimos 7 dias
+  const [{ data: allInsumos }, { data: allTalhoes }, { data: recentTx }] = await Promise.all([
     supabase.from('insumos').select('farm_id, quantity, min_quantity').in('farm_id', farmIds),
     supabase.from('talhoes').select('farm_id, area_ha').in('farm_id', farmIds),
+    supabase
+      .from('transactions')
+      .select('farm_id, date, quantity, type')
+      .in('farm_id', farmIds)
+      .gte('date', sevenDaysAgo)
+      .eq('type', 'saida'),
   ])
 
   const insumosByFarm = new Map<string, { quantity: number; min_quantity: number | null }[]>()
@@ -53,6 +63,22 @@ async function getFarmsWithStats(userId: string, role: string, gestorId: string)
   for (const t of allTalhoes ?? []) {
     if (!talhoesByFarm.has(t.farm_id)) talhoesByFarm.set(t.farm_id, [])
     talhoesByFarm.get(t.farm_id)!.push(t)
+  }
+
+  // Monta sparkline: 7 buckets (dia -6 até hoje), kg de saída por dia
+  const buildSparkline = (farmId: string): number[] => {
+    const buckets: Record<string, number> = {}
+    for (let d = 6; d >= 0; d--) {
+      const date = new Date(Date.now() - d * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0]
+      buckets[date] = 0
+    }
+    for (const tx of recentTx ?? []) {
+      if (tx.farm_id === farmId && tx.date in buckets) {
+        buckets[tx.date] += Number(tx.quantity)
+      }
+    }
+    return Object.values(buckets)
   }
 
   return farmsData.map((farm) => {
@@ -75,6 +101,7 @@ async function getFarmsWithStats(userId: string, role: string, gestorId: string)
       emptyCount,
       lowCount,
       totalAreaHa,
+      sparkline: buildSparkline(farm.id),
     }
   })
 }
@@ -137,6 +164,7 @@ export default async function DashboardPage() {
               emptyCount={farm.emptyCount}
               lowCount={farm.lowCount}
               totalAreaHa={farm.totalAreaHa}
+              sparkline={farm.sparkline}
             />
           ))}
         </div>

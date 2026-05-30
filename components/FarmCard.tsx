@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Sparkline } from '@/components/Sparkline'
 
 interface FarmCardProps {
   id: string
@@ -11,6 +12,8 @@ interface FarmCardProps {
   emptyCount: number
   lowCount: number
   totalAreaHa?: number
+  /** 7 valores (kg saída/dia) para o mini-gráfico */
+  sparkline?: number[]
 }
 
 export function FarmCard({
@@ -24,6 +27,7 @@ export function FarmCard({
   emptyCount,
   lowCount,
   totalAreaHa = 0,
+  sparkline,
 }: FarmCardProps) {
   const allOk    = insumoCount > 0 && emptyCount === 0 && lowCount === 0
   const hasAlerts = emptyCount > 0 || lowCount > 0
@@ -69,6 +73,23 @@ export function FarmCard({
             <p className="text-xs text-gray-500">{talhaoCount === 1 ? 'Talhão' : 'Talhões'}</p>
           </div>
         </div>
+
+        {/* Mini-gráfico — tendência de aplicações nos últimos 7 dias */}
+        {sparkline && (
+          <div className="mt-4 rounded-lg border border-gray-800 bg-gray-800/30 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Aplicações — 7 dias</p>
+                <p className="mt-0.5 text-xs text-gray-400">
+                  {sparkline.some(v => v > 0)
+                    ? `${sparkline.reduce((a, b) => a + b, 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg retirados`
+                    : 'Sem movimentações'}
+                </p>
+              </div>
+              <Sparkline data={sparkline} width={72} height={26} />
+            </div>
+          </div>
+        )}
 
         {/* Área total cadastrada */}
         {totalAreaHa > 0 && (

@@ -4,21 +4,34 @@
 // Fire-and-forget: erros são logados mas nunca lançados — falha de push
 // não deve falhar a operação principal (mesma filosofia de logAudit).
 //
-// Limpeza automática: tokens inválidos (registration-token-not-registered)
-// são removidos do Supabase para evitar acumular tokens mortos.
+// Limpeza automática: tokens inválidos são removidos do Supabase para
+// evitar acumular tokens mortos.
 
 import admin from 'firebase-admin'
 import { createServerClient } from './supabase'
 
+// Códigos FCM que indicam token definitivamente inválido/expirado
+const INVALID_TOKEN_CODES = new Set([
+  'messaging/registration-token-not-registered',
+  'messaging/invalid-registration-token',
+])
+
 function getFirebaseApp(): admin.app.App {
   if (admin.apps.length > 0) return admin.apps[0]!
+
+  // Guard explícito: erro claro se env vars ausentes (capturado pelo try/catch)
+  const projectId   = process.env.FIREBASE_PROJECT_ID
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
+  const privateKey  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      '[fcm] Variáveis FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL e FIREBASE_PRIVATE_KEY são obrigatórias.'
+    )
+  }
+
   return admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId:   process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // Vercel armazena \n como literal — precisa converter de volta
-      privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
+    credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
   })
 }
 
@@ -43,31 +56,34 @@ export async function sendPushNotification(
       notification: { title, body },
       android: {
         notification: {
-          color:       '#22c55e',
-          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+          color: '#22c55e',
+          // Sem clickAction — o Capacitor/Android abre o app via IntentFilter padrão
         },
         priority: 'high',
       },
     })
 
-    // Remove tokens que o FCM reportou como inválidos
+    console.log(`[fcm] Enviados: ${response.successCount} ok, ${response.failureCount} falha(s).`)
+
+    // Remove tokens que o FCM reportou como definitivamente inválidos
     const invalidTokens: string[] = []
     response.responses.forEach((r, i) => {
-      if (
-        !r.success &&
-        r.error?.code === 'messaging/registration-token-not-registered'
-      ) {
+      if (!r.success && r.error?.code && INVALID_TOKEN_CODES.has(r.error.code)) {
         invalidTokens.push(tokens[i])
       }
     })
 
     if (invalidTokens.length > 0) {
       const supabase = createServerClient()
-      await supabase
+      const { error: deleteError } = await supabase
         .from('push_tokens')
         .delete()
         .in('fcm_token', invalidTokens)
-      console.log(`[fcm] Removidos ${invalidTokens.length} token(s) inválido(s).`)
+      if (deleteError) {
+        console.error('[fcm] Erro ao remover tokens inválidos:', deleteError.message)
+      } else {
+        console.log(`[fcm] Removidos ${invalidTokens.length} token(s) inválido(s).`)
+      }
     }
   } catch (e) {
     console.error('[fcm] sendPushNotification error:', e)

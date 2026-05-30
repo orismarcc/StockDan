@@ -5,6 +5,7 @@ import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
 import { isValidDate, isValidQuantity, isUUID, withinLength, trimField, parseClientTimestamp } from '@/lib/validate'
+import { notifyNovaAplicacao, notifyEstoqueCritico } from '@/lib/notifications'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -135,9 +136,37 @@ export async function POST(req: NextRequest, { params }: Params) {
   // Busca transaction com joins para o response (display only — escrita já é atômica)
   const { data: tx } = await supabase
     .from('transactions')
-    .select('*, insumos(title, unit), talhoes(id, name), users(name)')
+    .select('*, insumos(title, unit, min_quantity), talhoes(id, name), users(name), farms(name)')
     .eq('id', transaction_id)
     .single()
+
+  // Fire-and-forget: notificações não bloqueiam o response (P11)
+  if (tx) {
+    const insumo = tx.insumos as { title: string; unit: string; min_quantity: number | null } | null
+    const talhao = tx.talhoes as { id: string; name: string } | null
+    const user   = tx.users   as { name: string } | null
+    const farm   = tx.farms   as { name: string } | null
+
+    void notifyNovaAplicacao({
+      gestorId:    session.gestor_id,
+      userName:    user?.name    ?? 'Usuário',
+      insumoTitle: insumo?.title ?? 'Insumo',
+      talhaoName:  talhao?.name  ?? 'Talhão',
+      quantity:    Number(quantity),
+      unit:        insumo?.unit  ?? 'kg',
+    })
+
+    if (insumo?.min_quantity != null && new_quantity < insumo.min_quantity) {
+      void notifyEstoqueCritico({
+        gestorId:    session.gestor_id,
+        farmName:    farm?.name    ?? 'Fazenda',
+        insumoTitle: insumo.title,
+        currentQty:  new_quantity,
+        minQty:      insumo.min_quantity,
+        unit:        insumo.unit,
+      })
+    }
+  }
 
   return NextResponse.json({ ok: true, transaction: tx, newQuantity: new_quantity }, { status: 201 })
 }

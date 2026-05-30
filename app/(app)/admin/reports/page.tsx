@@ -36,6 +36,17 @@ export default async function ReportsPage() {
         </p>
       </div>
 
+      {/* Aviso sobre domínio Resend — remover quando domínio for verificado */}
+      <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+        <p className="text-sm font-medium text-amber-400">⚠️ Verificação de domínio pendente</p>
+        <p className="mt-1 text-xs text-amber-500/80 leading-relaxed">
+          Para enviar relatórios para qualquer e-mail, é necessário verificar um domínio em{' '}
+          <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer"
+            className="underline hover:text-amber-400">resend.com/domains</a>.
+          Sem verificação, os e-mails só chegam ao endereço da conta Resend cadastrada.
+        </p>
+      </div>
+
       <ReportScheduleForm
         initial={schedule ?? null}
         defaultEmail={me?.email ?? ''}

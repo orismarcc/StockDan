@@ -1,4 +1,4 @@
-const CACHE = 'stockdan-v5'
+const CACHE = 'stockdan-v6'
 
 // Shell do app — carregado na instalação do SW
 const PRECACHE = [
@@ -17,6 +17,10 @@ const PRECACHE = [
 const CRITICAL_ROUTES = [
   '/dashboard',
   '/farms',
+  '/analise',
+  '/admin/audit',
+  '/admin/reports',
+  '/settings',
 ]
 
 // ── Install: precache shell ──────────────────────────────────────────────────

@@ -4,6 +4,18 @@ import { getActiveSession, createToken, COOKIE } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { parseBody } from '@/lib/utils'
 import { withinLength, trimField } from '@/lib/validate'
+import { withAuth } from '@/lib/withAuth'
+
+/** GET /api/profile — retorna nome e idade do usuário autenticado */
+export const GET = withAuth(async (_req, session) => {
+  const supabase = createServerClient()
+  const { data } = await supabase
+    .from('users')
+    .select('name, age')
+    .eq('id', session.id)
+    .single()
+  return NextResponse.json({ name: data?.name ?? session.name, age: data?.age ?? null })
+})
 
 /**
  * PATCH /api/profile

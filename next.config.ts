@@ -12,7 +12,7 @@ const CSP = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST}`,
+  `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://fcm.googleapis.com https://firebaseinstallations.googleapis.com https://*.googleapis.com`,
   "img-src 'self' data: blob:",
   "font-src 'self'",
   "worker-src 'self' blob:",

@@ -44,12 +44,12 @@ export default async function InsumoDetailPage({
   if (!farm || !insumo) notFound()
 
   const totalEntradas = (transactions ?? [])
-    .filter((t: any) => t.type === 'entrada')
-    .reduce((sum: number, t: any) => sum + Number(t.quantity), 0)
+    .filter((t: { type: string; quantity: number | string }) => t.type === 'entrada')
+    .reduce((sum: number, t: { type: string; quantity: number | string }) => sum + Number(t.quantity), 0)
 
   const totalSaidas = (transactions ?? [])
-    .filter((t: any) => t.type === 'saida')
-    .reduce((sum: number, t: any) => sum + Number(t.quantity), 0)
+    .filter((t: { type: string; quantity: number | string }) => t.type === 'saida')
+    .reduce((sum: number, t: { type: string; quantity: number | string }) => sum + Number(t.quantity), 0)
 
   return (
     <div>

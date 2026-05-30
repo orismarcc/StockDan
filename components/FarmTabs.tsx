@@ -539,7 +539,7 @@ const InsumoRow = memo(function InsumoRow({
   onEditQty,
   onDeleted,
 }: {
-  ins: any
+  ins: { id: string; title: string; unit: string; quantity: number; min_quantity?: number | null; description?: string | null }
   farmId: string
   userRole: Role
   onAddStock: () => void
@@ -616,7 +616,7 @@ const InsumoCard = memo(function InsumoCard({
   onEditQty,
   onDeleted,
 }: {
-  ins: any
+  ins: { id: string; title: string; unit: string; quantity: number; min_quantity?: number | null; description?: string | null }
   farmId: string
   userRole: Role
   onAddStock: () => void

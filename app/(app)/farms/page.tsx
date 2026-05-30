@@ -10,7 +10,8 @@ export const metadata = { title: 'Fazendas' }
 
 async function getFarmsWithStats(userId: string, role: string, gestorId: string) {
   const supabase = createServerClient()
-  let farmsData: any[] = []
+  type FarmRow = { id: string; name: string; farmer_name: string; city: string; state: string; created_at: string }
+  let farmsData: FarmRow[] = []
 
   if (role === 'gestor') {
     const { data } = await supabase.from('farms').select('*').eq('owner_id', userId).order('name')
@@ -22,7 +23,7 @@ async function getFarmsWithStats(userId: string, role: string, gestorId: string)
       .select('farms!inner(*)')
       .eq('user_id', userId)
       .eq('farms.owner_id', gestorId)
-    farmsData = (data ?? []).map((r: any) => r.farms).filter(Boolean)
+    farmsData = (data ?? []).map((r) => r.farms as unknown as FarmRow).filter(Boolean)
   }
 
   if (farmsData.length === 0) return []

@@ -29,7 +29,7 @@ export const GET = withAuth(async (_req, session) => {
     .eq('farms.owner_id', session.gestor_id)
 
   if (error) return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
-  return NextResponse.json((data as any[]).map((r) => r.farms))
+  return NextResponse.json((data as { farms: unknown }[]).map((r) => r.farms))
 })
 
 export const POST = withAuth(async (req, session) => {

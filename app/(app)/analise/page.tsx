@@ -34,7 +34,7 @@ export default async function AnalisePage() {
       .select('farms!inner(id, name, owner_id)')
       .eq('user_id', session.id)
       .eq('farms.owner_id', session.gestor_id)
-    farms = ((data ?? []).map((r: any) => r.farms).filter(Boolean) as { id: string; name: string }[])
+    farms = ((data ?? []).map((r: { farms: { id: string; name: string } | { id: string; name: string }[] }) => r.farms).flat().filter(Boolean) as { id: string; name: string }[])
     farmIds = farms.map((f) => f.id)
   }
 
@@ -73,22 +73,28 @@ export default async function AnalisePage() {
   const { data: txRaw } = await txQuery
 
   // 4. Fetch operator names for all unique user_ids in transactions
-  const userIds = [...new Set((txRaw ?? []).map((t: any) => t.user_id).filter(Boolean))] as string[]
+  const userIds = [...new Set((txRaw ?? []).map((t: { user_id: string }) => t.user_id).filter(Boolean))] as string[]
   const { data: usersRaw } = userIds.length > 0
     ? await supabase.from('users').select('id, name').in('id', userIds)
     : { data: [] }
 
   const data: AnaliseData = {
     farms,
-    talhoes: (talhoesRaw ?? []).map((t: any) => ({
+    talhoes: (talhoesRaw ?? []).map((t) => ({
       id: t.id,
       farm_id: t.farm_id,
       name: t.name,
       area_ha: Number(t.area_ha),
     })),
     insumos: insumosRaw ?? [],
-    transactions: (txRaw ?? []).map((t: any) => ({
-      ...t,
+    transactions: (txRaw ?? []).map((t) => ({
+      id: t.id,
+      farm_id: t.farm_id,
+      insumo_id: t.insumo_id,
+      talhao_id: t.talhao_id,
+      user_id: t.user_id,
+      date: t.date,
+      notes: t.notes,
       quantity: Number(t.quantity),
       area_ha: t.area_ha != null ? Number(t.area_ha) : null,
     })),

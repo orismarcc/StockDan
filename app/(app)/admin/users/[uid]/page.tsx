@@ -37,7 +37,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ uid
     .eq('owner_id', session.gestor_id)
     .order('name')
 
-  const assignedFarmIds = (farmLinks ?? []).map((f: any) => f.farm_id)
+  const assignedFarmIds = (farmLinks ?? []).map((f: { farm_id: string }) => f.farm_id)
 
   return (
     <div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function SettingsPage() {
@@ -10,8 +10,21 @@ export default function SettingsPage() {
   const [name, setName]           = useState('')
   const [age, setAge]             = useState('')
   const [profileLoading, setProfileLoading] = useState(false)
+  const [profileFetching, setProfileFetching] = useState(true)
   const [profileSuccess, setProfileSuccess] = useState(false)
   const [profileError, setProfileError]     = useState('')
+
+  // Pré-preenche nome e idade do usuário ao carregar
+  useEffect(() => {
+    fetch('/api/profile')
+      .then(r => r.json())
+      .then(d => {
+        if (d.name) setName(d.name)
+        if (d.age)  setAge(String(d.age))
+      })
+      .catch(() => {})
+      .finally(() => setProfileFetching(false))
+  }, [])
 
   // --- Senha ---
   const [currentPwd, setCurrentPwd]   = useState('')
@@ -110,54 +123,70 @@ export default function SettingsPage() {
             Informações pessoais
           </h2>
           <form onSubmit={handleProfileSave} className="flex flex-col gap-4">
-            {/* Nome */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-300">Nome completo</label>
-              <input
-                type="text"
-                placeholder="Seu nome"
-                value={name}
-                onChange={(e) => { setName(e.target.value); setProfileSuccess(false) }}
-                required
-                minLength={2}
-                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/60 transition-colors min-h-[44px]"
-              />
-            </div>
+            {profileFetching ? (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <div className="h-4 w-24 rounded bg-gray-800 animate-pulse" />
+                  <div className="h-11 w-full rounded-lg bg-gray-800 animate-pulse" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <div className="h-4 w-16 rounded bg-gray-800 animate-pulse" />
+                  <div className="h-11 w-full rounded-lg bg-gray-800 animate-pulse" />
+                </div>
+                <div className="h-11 w-full rounded-lg bg-gray-800 animate-pulse" />
+              </div>
+            ) : (
+              <>
+                {/* Nome */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-300">Nome completo</label>
+                  <input
+                    type="text"
+                    placeholder="Seu nome"
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setProfileSuccess(false) }}
+                    required
+                    minLength={2}
+                    className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/60 transition-colors min-h-[44px]"
+                  />
+                </div>
 
-            {/* Idade */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-300">
-                Idade <span className="text-gray-600 font-normal">(opcional)</span>
-              </label>
-              <input
-                type="number"
-                placeholder="Ex: 32"
-                value={age}
-                onChange={(e) => { setAge(e.target.value); setProfileSuccess(false) }}
-                min={1}
-                max={120}
-                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/60 transition-colors min-h-[44px]"
-              />
-            </div>
+                {/* Idade */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-300">
+                    Idade <span className="text-gray-600 font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Ex: 32"
+                    value={age}
+                    onChange={(e) => { setAge(e.target.value); setProfileSuccess(false) }}
+                    min={1}
+                    max={120}
+                    className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/60 transition-colors min-h-[44px]"
+                  />
+                </div>
 
-            {profileError && (
-              <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
-                {profileError}
-              </p>
+                {profileError && (
+                  <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                    {profileError}
+                  </p>
+                )}
+                {profileSuccess && (
+                  <p className="rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400">
+                    Perfil atualizado com sucesso.
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={profileLoading}
+                  className="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-50 transition-colors min-h-[44px]"
+                >
+                  {profileLoading ? 'Salvando…' : 'Salvar informações'}
+                </button>
+              </>
             )}
-            {profileSuccess && (
-              <p className="rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400">
-                Perfil atualizado com sucesso.
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={profileLoading}
-              className="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-50 transition-colors min-h-[44px]"
-            >
-              {profileLoading ? 'Salvando…' : 'Salvar informações'}
-            </button>
           </form>
         </section>
 

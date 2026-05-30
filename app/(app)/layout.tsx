@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { AppShell } from '@/components/AppShell'
+import { NotificationBootstrap } from '@/components/NotificationBootstrap'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession()
@@ -8,8 +9,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (session.mustChangePassword) redirect('/change-password')
 
   return (
-    <AppShell role={session.role} userName={session.name}>
-      {children}
-    </AppShell>
+    <>
+      {/* Registra FCM token silenciosamente — só ativo no APK Android */}
+      <NotificationBootstrap />
+      <AppShell role={session.role} userName={session.name}>
+        {children}
+      </AppShell>
+    </>
   )
 }

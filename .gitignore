@@ -40,6 +40,15 @@ yarn-error.log*
 # brainstorming visual companion
 .superpowers/
 
+# Android (gerado pelo Capacitor — não commitar)
+/android/
+
+# Firebase credentials — NUNCA commitar
+google-services.json
+**/google-services.json
+# Service account key — NUNCA commitar
+*firebase-adminsdk*.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

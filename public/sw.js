@@ -163,3 +163,38 @@ self.addEventListener('fetch', (event) => {
     )
   )
 })
+
+// ── Push notifications (FCM via WebView fallback) ────────────────────────────
+// Exibe notificação quando o app está em background no Android WebView.
+// No Capacitor nativo, o @capacitor/push-notifications trata isso —
+// este handler é o fallback para garantia.
+self.addEventListener('push', (event) => {
+  if (!event.data) return
+  let payload = {}
+  try { payload = event.data.json() } catch { payload = {} }
+
+  const title   = payload?.notification?.title ?? 'StockDan'
+  const body    = payload?.notification?.body  ?? ''
+  const options = {
+    body,
+    icon:  '/icons/icon-192.png',
+    badge: '/icons/icon-192-maskable.png',
+    data:  payload?.data ?? {},
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+// Abre o app no dashboard ao clicar na notificação
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        const existing = clientList.find((c) => c.url.includes(self.location.origin))
+        if (existing) return existing.focus()
+        return clients.openWindow('/dashboard')
+      })
+  )
+})

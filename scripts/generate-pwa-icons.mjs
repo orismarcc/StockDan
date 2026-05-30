@@ -19,18 +19,36 @@ const OUT_DIR = path.join(ROOT, 'public', 'icons');
 mkdirSync(OUT_DIR, { recursive: true });
 
 // ── SVG da marca (cubo 3-D branco, mesma path do Sidebar e Login) ──────────
+// Cubo 3D isométrico usando polígonos PREENCHIDOS (librsvg/sharp no Windows
+// não renderiza stroke — apenas fill funciona de forma confiável).
+// 3 faces com opacidade decrescente criam a ilusão de profundidade.
+//
+// Coordenadas base (viewBox 0 0 24 24, vértices do cubo):
+//   topo: (12,3),(20,7),(12,11),(4,7)
+//   direita: (20,7),(20,17),(12,21),(12,11)
+//   esquerda: (4,7),(4,17),(12,21),(12,11)
 function brandSvg(size) {
-  const pad  = Math.round(size * 0.18)          // ~18% de padding
+  const pad  = Math.round(size * 0.175)
   const icon = size - pad * 2
-  const sw   = Math.max(1, Math.round(icon / 13)) // stroke proporcional
+  const rx   = Math.round(size * 0.22)
+  const s    = icon / 24   // escala: 1 unit do viewBox = s px
+
+  // Converte coordenadas do viewBox para pixels absolutos no SVG final
+  const pt = ([x, y]) => `${pad + x * s},${pad + y * s}`
+
+  const top   = [[12,3],[20,7],[12,11],[4,7]]
+  const right = [[20,7],[20,17],[12,21],[12,11]]
+  const left  = [[4,7],[4,17],[12,21],[12,11]]
+
+  const poly = (pts, fill) =>
+    `<polygon points="${pts.map(pt).join(' ')}" fill="${fill}"/>`
+
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg"
     width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <rect width="${size}" height="${size}" rx="${Math.round(size * 0.22)}" fill="#22c55e"/>
-    <svg x="${pad}" y="${pad}" width="${icon}" height="${icon}" viewBox="0 0 24 24"
-      fill="none" stroke="white" stroke-width="${sw}"
-      stroke-linecap="round" stroke-linejoin="round">
-      <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7"/>
-    </svg>
+    <rect width="${size}" height="${size}" rx="${rx}" fill="#22c55e"/>
+    ${poly(top,   'rgba(255,255,255,0.97)')}
+    ${poly(right, 'rgba(255,255,255,0.78)')}
+    ${poly(left,  'rgba(255,255,255,0.58)')}
   </svg>`)
 }
 

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input } from './ui/Input'
 import { Button } from './ui/Button'
+import { parseDecimal, DECIMALS_AREA } from '@/lib/numeric'
 
 interface Talhao {
   id: string
@@ -52,7 +53,7 @@ export function TalhoesManager({ farmId, initialTalhoes, canDelete = false }: Ta
     const res = await fetch(`/api/farms/${farmId}/talhoes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, area_ha: Number(areaHa) }),
+      body: JSON.stringify({ name, area_ha: parseDecimal(areaHa, DECIMALS_AREA) ?? 0 }),
     })
 
     const data = await res.json()
@@ -73,7 +74,7 @@ export function TalhoesManager({ farmId, initialTalhoes, canDelete = false }: Ta
     const res = await fetch(`/api/farms/${farmId}/talhoes/${editingId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, area_ha: Number(areaHa) }),
+      body: JSON.stringify({ name, area_ha: parseDecimal(areaHa, DECIMALS_AREA) ?? 0 }),
     })
 
     const data = await res.json()
@@ -125,9 +126,8 @@ export function TalhoesManager({ farmId, initialTalhoes, canDelete = false }: Ta
                         />
                         <Input
                           label="Área (ha)"
-                          type="number"
-                          min="0.01"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           value={areaHa}
                           onChange={(e) => setAreaHa(e.target.value)}
                           required
@@ -177,9 +177,8 @@ export function TalhoesManager({ farmId, initialTalhoes, canDelete = false }: Ta
             />
             <Input
               label="Área (ha) *"
-              type="number"
-              min="0.01"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               placeholder="0.00"
               value={areaHa}
               onChange={(e) => setAreaHa(e.target.value)}

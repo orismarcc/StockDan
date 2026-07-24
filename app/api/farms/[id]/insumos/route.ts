@@ -6,6 +6,7 @@ import { can } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
 import { trimField, isValidDate, isValidQuantity, withinLength } from '@/lib/validate'
+import { roundTo, DECIMALS_QUANTITY } from '@/lib/numeric'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -82,8 +83,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     p_title:        title,
     p_description:  description,
     p_unit:         unit,
-    p_quantity:     Number(quantity),
-    p_min_quantity: min_quantity != null ? Number(min_quantity) : null,
+    p_quantity:     roundTo(Number(quantity), DECIMALS_QUANTITY),
+    p_min_quantity: min_quantity != null ? roundTo(Number(min_quantity), DECIMALS_QUANTITY) : null,
     p_date:         date,
   })
 

@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { todayISO } from '@/lib/utils'
 import { use } from 'react'
+import { parseDecimal, DECIMALS_QUANTITY } from '@/lib/numeric'
 
 export default function NewInsumoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: farmId } = use(params)
@@ -31,8 +32,8 @@ export default function NewInsumoPage({ params }: { params: Promise<{ id: string
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
-        quantity: Number(form.quantity),
-        min_quantity: form.min_quantity ? Number(form.min_quantity) : null,
+        quantity: parseDecimal(form.quantity, DECIMALS_QUANTITY) ?? 0,
+        min_quantity: form.min_quantity ? parseDecimal(form.min_quantity, DECIMALS_QUANTITY) : null,
       }),
     })
 
@@ -79,18 +80,16 @@ export default function NewInsumoPage({ params }: { params: Promise<{ id: string
 <div className="grid grid-cols-2 gap-4">
             <Input
               label="Estoque Inicial (kg)"
-              type="number"
-              min="0"
-              step="0.001"
+              type="text"
+              inputMode="decimal"
               placeholder="0"
               value={form.quantity}
               onChange={(e) => set('quantity', e.target.value)}
             />
             <Input
               label="Qtd Mínima (kg)"
-              type="number"
-              min="0"
-              step="0.001"
+              type="text"
+              inputMode="decimal"
               placeholder="opcional"
               value={form.min_quantity}
               onChange={(e) => set('min_quantity', e.target.value)}

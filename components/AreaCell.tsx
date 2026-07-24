@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { mutationQueue } from '@/lib/mutationQueue'
+import { parseDecimal, DECIMALS_AREA } from '@/lib/numeric'
 
 interface AreaCellProps {
   farmId: string
@@ -31,8 +32,8 @@ export function AreaCell({ farmId, txId, area }: AreaCellProps) {
   }
 
   async function save() {
-    const ha = parseFloat(value.replace(',', '.'))
-    if (isNaN(ha) || ha <= 0) {
+    const ha = parseDecimal(value, DECIMALS_AREA)
+    if (ha == null || ha <= 0) {
       setError('Valor inválido')
       return
     }
@@ -99,9 +100,8 @@ export function AreaCell({ farmId, txId, area }: AreaCellProps) {
         <div className="flex items-center gap-1.5">
           <input
             ref={inputRef}
-            type="number"
-            step="0.01"
-            min="0.01"
+            type="text"
+            inputMode="decimal"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKey}

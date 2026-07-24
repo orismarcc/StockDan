@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { parseIntStrict } from '@/lib/numeric'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -42,7 +43,8 @@ export default function SettingsPage() {
       setProfileError('Nome deve ter pelo menos 2 caracteres.')
       return
     }
-    if (age && (isNaN(Number(age)) || Number(age) < 1 || Number(age) > 120)) {
+    const parsedAge = age ? parseIntStrict(age) : null
+    if (age && (parsedAge === null || parsedAge < 1 || parsedAge > 120)) {
       setProfileError('Idade inválida (1–120).')
       return
     }
@@ -53,7 +55,7 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: name.trim(),
-        age:  age ? Number(age) : null,
+        age:  parsedAge,
       }),
     })
     setProfileLoading(false)
@@ -157,12 +159,11 @@ export default function SettingsPage() {
                     Idade <span className="text-gray-600 font-normal">(opcional)</span>
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     placeholder="Ex: 32"
                     value={age}
                     onChange={(e) => { setAge(e.target.value); setProfileSuccess(false) }}
-                    min={1}
-                    max={120}
                     className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/60 transition-colors min-h-[44px]"
                   />
                 </div>

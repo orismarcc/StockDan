@@ -6,6 +6,7 @@ import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
 import { isValidDate, isValidQuantity, isUUID, withinLength, trimField, parseClientTimestamp } from '@/lib/validate'
 import { notifyNovaAplicacao, notifyEstoqueCritico } from '@/lib/notifications'
+import { roundTo, DECIMALS_QUANTITY, DECIMALS_AREA } from '@/lib/numeric'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -117,10 +118,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     p_insumo_id:  insumo_id,
     p_talhao_id:  talhao_id,
     p_user_id:    session.id,
-    p_quantity:   Number(quantity),
+    p_quantity:   roundTo(Number(quantity), DECIMALS_QUANTITY),
     p_date:       date,
     p_notes:      notes || null,
-    p_area_ha:    area_ha != null && Number(area_ha) > 0 ? Number(area_ha) : null,
+    p_area_ha:    area_ha != null && Number(area_ha) > 0 ? roundTo(Number(area_ha), DECIMALS_AREA) : null,
     p_offline_id: (offline_id && typeof offline_id === 'string') ? offline_id : null,
     // Se o cliente enviou timestamp válido, usa; caso contrário a RPC usa NOW()
     ...(created_at_client ? { p_created_at: created_at_client } : {}),

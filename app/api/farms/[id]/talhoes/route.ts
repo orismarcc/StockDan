@@ -5,6 +5,7 @@ import { checkFarmAccess } from '@/lib/farmAccess'
 import { can } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
 import { trimField, isValidAreaHa, withinLength } from '@/lib/validate'
+import { roundTo, DECIMALS_AREA } from '@/lib/numeric'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!isValidAreaHa(body.area_ha)) {
     return NextResponse.json({ error: 'Área deve ser maior que zero (máx. 9.999.999 ha).' }, { status: 400 })
   }
-  const area_ha = Number(body.area_ha)
+  const area_ha = roundTo(Number(body.area_ha), DECIMALS_AREA)
 
   const { data, error } = await supabase
     .from('talhoes')

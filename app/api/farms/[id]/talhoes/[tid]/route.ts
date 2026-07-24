@@ -6,6 +6,7 @@ import { can } from '@/lib/permissions'
 import { logAudit } from '@/lib/audit'
 import { parseBody } from '@/lib/utils'
 import { trimField, isValidAreaHa, withinLength } from '@/lib/validate'
+import { roundTo, DECIMALS_AREA } from '@/lib/numeric'
 
 type Params = { params: Promise<{ id: string; tid: string }> }
 
@@ -33,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!isValidAreaHa(body.area_ha)) {
     return NextResponse.json({ error: 'Área deve ser maior que zero (máx. 9.999.999 ha).' }, { status: 400 })
   }
-  const area_ha = Number(body.area_ha)
+  const area_ha = roundTo(Number(body.area_ha), DECIMALS_AREA)
 
   // [LWW]
   if (updated_at_client) {

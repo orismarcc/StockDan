@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useFormDraft } from '@/hooks/useFormDraft'
 import { mutationQueue } from '@/lib/mutationQueue'
+import { parseDecimal, parseIntStrict, DECIMALS_RATE } from '@/lib/numeric'
 
 interface ImplementAdjustmentFormProps {
   farmId: string
@@ -50,7 +51,7 @@ function Field({
   onChange,
   type = 'text',
   placeholder,
-  step,
+  inputMode,
 }: {
   label: string
   unit?: string
@@ -59,7 +60,7 @@ function Field({
   onChange: (name: keyof FormData, v: string) => void
   type?: string
   placeholder?: string
-  step?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
 }) {
   return (
     <div>
@@ -67,7 +68,7 @@ function Field({
       <div className="flex items-center gap-2">
         <input
           type={type}
-          step={step}
+          inputMode={inputMode}
           value={value}
           onChange={(e) => onChange(name, e.target.value)}
           placeholder={placeholder ?? '—'}
@@ -117,7 +118,15 @@ export function ImplementAdjustmentForm({
     setError('')
     setOfflineOk(false)
 
-    const payload = { ...form, talhao_id: talhaoId }
+    const payload = {
+      ...form,
+      talhao_id: talhaoId,
+      taxa_kgha: form.taxa_kgha ? (parseDecimal(form.taxa_kgha, DECIMALS_RATE) ?? undefined) : '',
+      cv_percent: form.cv_percent ? (parseDecimal(form.cv_percent, DECIMALS_RATE) ?? undefined) : '',
+      rpm_maquina: form.rpm_maquina ? (parseIntStrict(form.rpm_maquina) ?? undefined) : '',
+      rpm_pratos_eixo: form.rpm_pratos_eixo ? (parseIntStrict(form.rpm_pratos_eixo) ?? undefined) : '',
+      num_bandejas: form.num_bandejas ? (parseIntStrict(form.num_bandejas) ?? undefined) : '',
+    }
 
     // ── Offline: enfileira mutacao ──────────────────────────────────────────
     if (!isOnline) {
@@ -198,16 +207,16 @@ export function ImplementAdjustmentForm({
           <Field label="Implemento" name="implemento" value={form.implemento} onChange={set} placeholder="Ex: Distribuidora centrífuga" />
         </div>
 
-        <Field label="Taxa a ser aplicada" unit="kg/ha" name="taxa_kgha" value={form.taxa_kgha} onChange={set} type="number" step="0.01" placeholder="0,00" />
+        <Field label="Taxa a ser aplicada" unit="kg/ha" name="taxa_kgha" value={form.taxa_kgha} onChange={set} type="text" inputMode="decimal" placeholder="0,00" />
         <Field label="Palhetas" name="palhetas" value={form.palhetas} onChange={set} placeholder="Ex: 4 palhetas por disco" />
 
-        <Field label="RPM Máquina" unit="rpm" name="rpm_maquina" value={form.rpm_maquina} onChange={set} type="number" step="1" placeholder="0" />
-        <Field label="RPM Pratos / Eixo" unit="rpm" name="rpm_pratos_eixo" value={form.rpm_pratos_eixo} onChange={set} type="number" step="1" placeholder="0" />
+        <Field label="RPM Máquina" unit="rpm" name="rpm_maquina" value={form.rpm_maquina} onChange={set} type="text" inputMode="numeric" placeholder="0" />
+        <Field label="RPM Pratos / Eixo" unit="rpm" name="rpm_pratos_eixo" value={form.rpm_pratos_eixo} onChange={set} type="text" inputMode="numeric" placeholder="0" />
 
-        <Field label="Nº de Bandejas" name="num_bandejas" value={form.num_bandejas} onChange={set} type="number" step="1" placeholder="0" />
+        <Field label="Nº de Bandejas" name="num_bandejas" value={form.num_bandejas} onChange={set} type="text" inputMode="numeric" placeholder="0" />
         <Field label="Espaçamento entre Bandejas" name="espacamento_bandejas" value={form.espacamento_bandejas} onChange={set} placeholder="Ex: 0,45 m" />
 
-        <Field label="Coeficiente de Variação (CV%)" unit="%" name="cv_percent" value={form.cv_percent} onChange={set} type="number" step="0.01" placeholder="0,00" />
+        <Field label="Coeficiente de Variação (CV%)" unit="%" name="cv_percent" value={form.cv_percent} onChange={set} type="text" inputMode="decimal" placeholder="0,00" />
         <Field label="Faixa de Aplicação" name="faixa_aplicacao" value={form.faixa_aplicacao} onChange={set} placeholder="Ex: 12 m" />
 
         <div className="sm:col-span-2">

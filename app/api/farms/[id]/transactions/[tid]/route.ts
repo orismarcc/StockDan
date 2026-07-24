@@ -6,6 +6,7 @@ import { can } from '@/lib/permissions'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
 import { isValidDate, isValidQuantity, isValidAreaHa, withinLength, trimField } from '@/lib/validate'
+import { roundTo, DECIMALS_QUANTITY, DECIMALS_AREA } from '@/lib/numeric'
 
 type Params = { params: Promise<{ id: string; tid: string }> }
 
@@ -68,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { error } = await supabase
       .from('transactions')
       .update({
-        area_ha: area_ha,
+        area_ha: roundTo(Number(area_ha), DECIMALS_AREA),
         updated_at_client: updated_at_client || null,
       })
       .eq('id', tid)
@@ -104,7 +105,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { data: rpc, error } = await supabase.rpc('editar_transacao', {
     p_tid:       tid,
     p_farm_id:   farm_id,
-    p_quantity:  Number(quantity),
+    p_quantity:  roundTo(Number(quantity), DECIMALS_QUANTITY),
     p_date:      date,
     p_talhao_id: talhao_id || null,
     p_notes:     notes ?? null,

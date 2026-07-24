@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
 import { Button } from './ui/Button'
+import { parseIntStrict } from '@/lib/numeric'
 
 interface Schedule {
   id?: string
@@ -136,21 +137,19 @@ export function ReportScheduleForm({ initial, defaultEmail }: Props) {
           ) : (
             <Input
               label="Dia do mês (1-28)"
-              type="number"
-              min={1}
-              max={28}
+              type="text"
+              inputMode="numeric"
               value={String(form.day_of_month ?? 1)}
-              onChange={(e) => update('day_of_month', Number(e.target.value))}
+              onChange={(e) => update('day_of_month', parseIntStrict(e.target.value) ?? 1)}
             />
           )}
 
           <Input
             label="Janela de dados (últimos N dias)"
-            type="number"
-            min={1}
-            max={365}
+            type="text"
+            inputMode="numeric"
             value={String(form.window_days)}
-            onChange={(e) => update('window_days', Number(e.target.value))}
+            onChange={(e) => update('window_days', parseIntStrict(e.target.value) ?? 1)}
             hint="Quantos dias para trás incluir no relatório (ex: 30 = último mês)"
           />
         </div>

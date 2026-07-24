@@ -10,6 +10,7 @@ import { Select } from './ui/Select'
 import type { Transaction } from './TransactionTable'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { mutationQueue } from '@/lib/mutationQueue'
+import { parseDecimal, DECIMALS_QUANTITY } from '@/lib/numeric'
 
 interface Talhao {
   id: string
@@ -51,7 +52,7 @@ export function EditTransactionModal({
     if (submittingRef.current) return
     setError('')
 
-    const qty = Number(quantity)
+    const qty = parseDecimal(quantity, DECIMALS_QUANTITY) ?? 0
     if (!quantity || qty <= 0 || qty > 9_999_999) {
       setError('Informe uma quantidade válida (máx. 9.999.999).')
       return
@@ -119,10 +120,8 @@ export function EditTransactionModal({
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input
           label={`Quantidade (${unitLabel}) *`}
-          type="number"
-          min="0.001"
-          max="9999999"
-          step="0.001"
+          type="text"
+          inputMode="decimal"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
           hint={undefined}

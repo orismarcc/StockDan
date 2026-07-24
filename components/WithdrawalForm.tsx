@@ -7,6 +7,7 @@ import { Input } from './ui/Input'
 import { Textarea } from './ui/Textarea'
 import { Button } from './ui/Button'
 import { formatQuantity, todayISO } from '@/lib/utils'
+import { parseDecimal, DECIMALS_AREA, DECIMALS_QUANTITY } from '@/lib/numeric'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useFormDraft } from '@/hooks/useFormDraft'
 import { offlineQueue } from '@/lib/offlineQueue'
@@ -100,7 +101,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
       return
     }
 
-    const qty = Number(quantity)
+    const qty = parseDecimal(quantity, DECIMALS_QUANTITY) ?? 0
     if (qty <= 0) {
       setError('Quantidade deve ser maior que zero.')
       return
@@ -113,7 +114,7 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
     setLoading(true)
     submittingRef.current = true
 
-    const area = areaHa ? parseFloat(areaHa.replace(',', '.')) : null
+    const area = areaHa ? parseDecimal(areaHa, DECIMALS_AREA) : null
     const areaPayload = area != null && area > 0 ? area : null
 
     if (!isOnline) {
@@ -296,10 +297,8 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
         {/* Quantidade */}
         <Input
           label="Quantidade (kg) *"
-          type="number"
-          min="0.001"
-          step="0.001"
-          max={selectedInsumo ? String(availableQty) : undefined}
+          type="text"
+          inputMode="decimal"
           placeholder="0"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
@@ -317,9 +316,8 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
           <div className="flex items-center gap-2">
             <input
               id="withdrawal-area-ha"
-              type="number"
-              step="0.01"
-              min="0.01"
+              type="text"
+              inputMode="decimal"
               value={areaHa}
               onChange={(e) => setAreaHa(e.target.value)}
               placeholder="0,00"
@@ -328,14 +326,19 @@ export function WithdrawalForm({ farmId, insumos, talhoes, talhaoStats = {}, ini
             <span className="shrink-0 text-sm text-gray-500">ha</span>
           </div>
           {/* Preview kg/ha se quantidade e área preenchidas */}
-          {quantity && areaHa && Number(quantity) > 0 && parseFloat(areaHa.replace(',', '.')) > 0 && (
-            <p className="text-xs text-gray-500">
-              Taxa desta aplicação:{' '}
-              <span className="font-medium text-green-400">
-                {(Number(quantity) / parseFloat(areaHa.replace(',', '.'))).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
-              </span>
-            </p>
-          )}
+          {(() => {
+            const q = parseDecimal(quantity)
+            const a = parseDecimal(areaHa)
+            if (!q || !a || q <= 0 || a <= 0) return null
+            return (
+              <p className="text-xs text-gray-500">
+                Taxa desta aplicação:{' '}
+                <span className="font-medium text-green-400">
+                  {(q / a).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg/ha
+                </span>
+              </p>
+            )
+          })()}
         </div>
 
         <Input

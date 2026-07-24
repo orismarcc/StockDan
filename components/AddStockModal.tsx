@@ -7,6 +7,7 @@ import { Input } from './ui/Input'
 import { Textarea } from './ui/Textarea'
 import { Button } from './ui/Button'
 import { todayISO } from '@/lib/utils'
+import { parseDecimal, DECIMALS_QUANTITY } from '@/lib/numeric'
 
 interface AddStockModalProps {
   farmId: string
@@ -31,7 +32,7 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
     if (submittingRef.current) return
     setError('')
 
-    const qty = Number(quantity)
+    const qty = parseDecimal(quantity, DECIMALS_QUANTITY) ?? 0
     if (!quantity || qty <= 0 || qty > 9_999_999) {
       setError('Informe uma quantidade válida (máx. 9.999.999).')
       return
@@ -69,10 +70,8 @@ export function AddStockModal({ farmId, insumoId, insumoTitle, unit, onClose, on
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input
           label="Quantidade (kg) *"
-          type="number"
-          min="0.001"
-          max="9999999"
-          step="0.001"
+          type="text"
+          inputMode="decimal"
           placeholder="0"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}

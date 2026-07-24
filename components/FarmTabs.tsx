@@ -13,6 +13,7 @@ import { RegulagemModal } from './RegulagemModal'
 import { Button } from './ui/Button'
 import { useFarmPrefetch } from '@/hooks/useFarmPrefetch'
 import { can, type Role } from '@/lib/permissions'
+import { parseDecimal, DECIMALS_QUANTITY } from '@/lib/numeric'
 
 type TabId = 'talhoes' | 'insumos' | 'historico'
 
@@ -710,11 +711,11 @@ function AdjustQuantityModal({
   const router = useRouter()
 
   const unitLabel = 'kg'
-  const delta = Number(newQty) - currentQty
+  const delta = (parseDecimal(newQty, DECIMALS_QUANTITY) ?? NaN) - currentQty
 
   async function handleSave() {
     if (submittingRef.current) return
-    const qty = Number(newQty)
+    const qty = parseDecimal(newQty, DECIMALS_QUANTITY) ?? NaN
     if (isNaN(qty) || qty < 0 || qty > 9_999_999) { setError('Quantidade inválida (máx. 9.999.999).'); return }
     setLoading(true); setError('')
     submittingRef.current = true
@@ -743,10 +744,8 @@ function AdjustQuantityModal({
           </label>
           <div className="flex items-center gap-2">
             <input
-              type="number"
-              min="0"
-              max="9999999"
-              step="0.001"
+              type="text"
+              inputMode="decimal"
               value={newQty}
               onChange={(e) => setNewQty(e.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2.5 text-sm text-gray-100 focus:border-green-500/60 focus:outline-none"

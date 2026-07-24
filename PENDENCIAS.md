@@ -29,7 +29,7 @@
 
 | ID | Tarefa | Status | Detalhes |
 |---|---|---|---|
-| P-07 | **Dashboard mini-gráfico** | 🔄 Em andamento | Sparkline de tendência de estoque nos últimos 7 dias nos cards de fazenda. |
+| P-07 | **Dashboard mini-gráfico** | ✅ Concluído | Sparkline de aplicações (7 dias) nos cards de fazenda. |
 | P-08 | **Notificações para Agrônomo** | ⏳ Pendente | Estender notificações de estoque crítico para Agrônomo das fazendas que gerencia. |
 | P-09 | **Importação CSV** | ⏳ Pendente | Importar transações históricas via planilha para migrar de sistemas antigos. |
 | P-10 | **iOS / App Store** | ⏳ Pendente | `npx cap add ios` — requer Mac + conta Apple Developer ($99/ano). |
@@ -50,6 +50,11 @@
 - any types: eliminados em 7 arquivos
 - schema.sql: sincronizado com 28 migrations
 - CRON_SECRET: configurado e funcional
+- Dashboard mini-gráfico (sparkline 7 dias)
+- **Fix crítico de precisão numérica**: inputs decimais migrados de
+  `type=number step` para `inputMode=decimal` (elimina step-snapping 3→2,99
+  em WebView/pt-BR) + rede de arredondamento server-side em todas as rotas
+  que gravam medidas/quantidades. `lib/numeric.ts` com parseDecimal/roundTo.
 
 ---
 

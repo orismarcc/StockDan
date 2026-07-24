@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase'
 import { checkFarmAccess } from '@/lib/farmAccess'
 import { parseBody } from '@/lib/utils'
 import { isUUID } from '@/lib/validate'
+import { roundTo, parseIntStrict, DECIMALS_RATE } from '@/lib/numeric'
 
 /** Valida timestamp do cliente: ISO válido, últimos 7 dias até +1 min. */
 function parseClientTimestamp(raw: unknown): string | null {
@@ -104,13 +105,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       talhao_id,
       user_id: session.id,
       implemento: implemento || null,
-      taxa_kgha: taxa_kgha ? Number(taxa_kgha) : null,
+      taxa_kgha: taxa_kgha ? roundTo(Number(taxa_kgha), DECIMALS_RATE) : null,
       palhetas: palhetas || null,
-      rpm_maquina: rpm_maquina ? Number(rpm_maquina) : null,
-      rpm_pratos_eixo: rpm_pratos_eixo ? Number(rpm_pratos_eixo) : null,
-      num_bandejas: num_bandejas ? Number(num_bandejas) : null,
+      rpm_maquina: rpm_maquina ? parseIntStrict(rpm_maquina) : null,
+      rpm_pratos_eixo: rpm_pratos_eixo ? parseIntStrict(rpm_pratos_eixo) : null,
+      num_bandejas: num_bandejas ? parseIntStrict(num_bandejas) : null,
       espacamento_bandejas: espacamento_bandejas || null,
-      cv_percent: cv_percent ? Number(cv_percent) : null,
+      cv_percent: cv_percent ? roundTo(Number(cv_percent), DECIMALS_RATE) : null,
       faixa_aplicacao: faixa_aplicacao || null,
       comporta: comporta || null,
       offline_id: offline_id || null,

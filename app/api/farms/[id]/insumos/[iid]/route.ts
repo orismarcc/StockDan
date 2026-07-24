@@ -7,6 +7,7 @@ import { logAudit } from '@/lib/audit'
 import { parseBody } from '@/lib/utils'
 import { parseRpcError } from '@/lib/rpcErrors'
 import { trimField, isValidQuantity, withinLength } from '@/lib/validate'
+import { roundTo, DECIMALS_QUANTITY } from '@/lib/numeric'
 
 type Params = { params: Promise<{ id: string; iid: string }> }
 
@@ -65,7 +66,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   // ── Ajuste de quantidade: RPC atômica ──────────────────────────────────────
   if (quantity !== undefined) {
-    const newQty = Number(quantity)
+    const newQty = roundTo(Number(quantity), DECIMALS_QUANTITY)
     if (!Number.isFinite(newQty) || newQty < 0 || newQty > 9_999_999) {
       return NextResponse.json({ error: 'Estoque inválido (deve ser ≥ 0 e ≤ 9.999.999).' }, { status: 400 })
     }
@@ -109,7 +110,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     updateData.description = d
   }
   if (min_quantity !== undefined) {
-    const mq = min_quantity != null ? Number(min_quantity) : null
+    const mq = min_quantity != null ? roundTo(Number(min_quantity), DECIMALS_QUANTITY) : null
     if (mq !== null && (!Number.isFinite(mq) || mq < 0 || mq > 9_999_999)) {
       return NextResponse.json({ error: 'Estoque mínimo inválido.' }, { status: 400 })
     }

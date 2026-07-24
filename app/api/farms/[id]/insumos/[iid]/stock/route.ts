@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     p_farm_id:    farm_id,
     p_insumo_id:  insumo_id,
     p_user_id:    session.id,
-    p_quantity:   Number(quantity),
+    p_quantity:   roundTo(Number(quantity), DECIMALS_QUANTITY),
     p_date:       date,
     p_notes:      notes || null,
     p_offline_id: offline_id,
